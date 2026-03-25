@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit && eslint src/ tests/",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "release": "release-it"
   },
   "keywords": [
     "statemachine",
@@ -24,6 +25,18 @@
     "status",
     "process"
   ],
+  "author": "camcima (https://github.com/camcima)",
+  "contributors": [
+    "metabor (https://github.com/metabor)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/camcima/finita.git"
+  },
+  "homepage": "https://github.com/camcima/finita",
+  "bugs": {
+    "url": "https://github.com/camcima/finita/issues"
+  },
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -31,6 +44,7 @@
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",
+    "release-it": "^19.2.4",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.57.2",
     "vitest": "^3.0.0"
