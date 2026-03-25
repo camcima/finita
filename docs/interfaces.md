@@ -2,7 +2,7 @@
 
 All TypeScript interfaces exported by the library. These can be used to create custom implementations of any component.
 
-**Import:** `import type { InterfaceName } from 'finita'`
+**Import:** `import type { InterfaceName } from '@camcima/finita'`
 
 ```mermaid
 classDiagram

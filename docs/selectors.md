@@ -24,7 +24,7 @@ Selectors receive the **already-filtered** list of active transitions and return
 
 ## OneOrNoneActiveTransition
 
-**Import:** `import { OneOrNoneActiveTransition } from 'finita'`
+**Import:** `import { OneOrNoneActiveTransition } from '@camcima/finita'`
 
 The simplest selector. Expects zero or one active transition. Throws if more than one is active.
 
@@ -51,7 +51,7 @@ new OneOrNoneActiveTransition();
 ### Example
 
 ```typescript
-import { Statemachine, Process, State, Transition } from "finita";
+import { Statemachine, Process, State, Transition } from "@camcima/finita";
 
 // Default -- uses OneOrNoneActiveTransition
 const sm = new Statemachine(subject, process);
@@ -61,7 +61,7 @@ const sm = new Statemachine(subject, process);
 
 ## ScoreTransition
 
-**Import:** `import { ScoreTransition } from 'finita'`
+**Import:** `import { ScoreTransition } from '@camcima/finita'`
 
 Selects the transition with the highest "specificity score". Prefers transitions that have more criteria (event name, condition) over bare transitions.
 
@@ -109,7 +109,7 @@ import {
   State,
   Transition,
   Tautology,
-} from "finita";
+} from "@camcima/finita";
 
 const active = new State("active");
 const expired = new State("expired");
@@ -132,7 +132,7 @@ sm.triggerEvent("renew");
 
 ## WeightTransition
 
-**Import:** `import { WeightTransition } from 'finita'`
+**Import:** `import { WeightTransition } from '@camcima/finita'`
 
 Selects the transition with the highest weight. Transitions have a default weight of `1`, which can be changed with `setWeight()`.
 
@@ -166,7 +166,7 @@ import {
   State,
   Transition,
   CallbackCondition,
-} from "finita";
+} from "@camcima/finita";
 
 const pending = new State("pending");
 const vipApproved = new State("vip-approved");
@@ -210,7 +210,7 @@ flowchart LR
 ```
 
 ```typescript
-import { ScoreTransition, WeightTransition } from "finita";
+import { ScoreTransition, WeightTransition } from "@camcima/finita";
 
 // First select by score, then break ties by weight
 const selector = new ScoreTransition(new WeightTransition());
@@ -225,7 +225,10 @@ const sm = new Statemachine(subject, process, null, selector);
 Implement `TransitionSelectorInterface` for custom selection logic:
 
 ```typescript
-import type { TransitionSelectorInterface, TransitionInterface } from "finita";
+import type {
+  TransitionSelectorInterface,
+  TransitionInterface,
+} from "@camcima/finita";
 
 class RandomTransition implements TransitionSelectorInterface {
   selectTransition(

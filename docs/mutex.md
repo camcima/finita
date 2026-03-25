@@ -5,7 +5,7 @@ The mutex system provides concurrency control for the state machine. It prevents
 All mutexes implement `MutexInterface`:
 
 ```typescript
-import type { MaybePromise } from "finita";
+import type { MaybePromise } from "@camcima/finita";
 // MaybePromise<T> = T | Promise<T>
 
 interface MutexInterface {
@@ -28,7 +28,7 @@ interface MutexInterface {
 
 ## NullMutex
 
-**Import:** `import { NullMutex } from 'finita'`
+**Import:** `import { NullMutex } from '@camcima/finita'`
 
 A no-op mutex that always succeeds. This is the default mutex used by the state machine.
 
@@ -63,7 +63,7 @@ const sm = new Statemachine(subject, process, null, null, new NullMutex());
 
 ## LockAdapterMutex
 
-**Import:** `import { LockAdapterMutex } from 'finita'`
+**Import:** `import { LockAdapterMutex } from '@camcima/finita'`
 
 A mutex that delegates to a `LockAdapterInterface` implementation with a named resource. This allows plugging in distributed locking mechanisms (Redis, database locks, etc.).
 
@@ -97,8 +97,8 @@ new LockAdapterMutex(lockAdapter: LockAdapterInterface, resourceName: string)
 ### Example
 
 ```typescript
-import { LockAdapterMutex, Statemachine } from "finita";
-import type { LockAdapterInterface } from "finita";
+import { LockAdapterMutex, Statemachine } from "@camcima/finita";
+import type { LockAdapterInterface } from "@camcima/finita";
 
 // Simple in-memory lock adapter
 class InMemoryLockAdapter implements LockAdapterInterface {
@@ -133,7 +133,7 @@ await mutex.releaseLock();
 
 ## MutexFactory
 
-**Import:** `import { MutexFactory } from 'finita'`
+**Import:** `import { MutexFactory } from '@camcima/finita'`
 
 Creates `LockAdapterMutex` instances automatically from subject objects. Used with the `Factory` pattern to provide locking per subject.
 
@@ -161,7 +161,7 @@ type StringConverter = (subject: unknown) => string;
 ### Example
 
 ```typescript
-import { MutexFactory, Factory, SingleProcessDetector } from "finita";
+import { MutexFactory, Factory, SingleProcessDetector } from "@camcima/finita";
 
 const lockAdapter = new RedisLockAdapter(redisClient);
 const mutexFactory = new MutexFactory(
@@ -181,7 +181,7 @@ const sm = factory.createStatemachine(order);
 ## LockAdapterInterface
 
 ```typescript
-import type { MaybePromise } from "finita";
+import type { MaybePromise } from "@camcima/finita";
 // MaybePromise<T> = T | Promise<T>
 
 interface LockAdapterInterface {
@@ -202,7 +202,7 @@ Implement this interface to plug in your own locking mechanism. Methods can retu
 An async adapter that returns `Promise<boolean>`, which satisfies `MaybePromise<boolean>`:
 
 ```typescript
-import type { LockAdapterInterface } from "finita";
+import type { LockAdapterInterface } from "@camcima/finita";
 
 class RedisLockAdapter implements LockAdapterInterface {
   constructor(private client: RedisClient) {}

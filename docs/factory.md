@@ -14,7 +14,7 @@ The factory module provides a pattern for creating pre-configured state machines
 
 ## Factory
 
-**Import:** `import { Factory } from 'finita'`
+**Import:** `import { Factory } from '@camcima/finita'`
 
 The main factory class. Creates `Statemachine` instances by detecting the process and optionally the current state from the subject.
 
@@ -79,7 +79,7 @@ import {
   StatefulStatusChanger,
   TransitionLogger,
   ScoreTransition,
-} from "finita";
+} from "@camcima/finita";
 
 const factory = new Factory(
   new SingleProcessDetector(orderProcess),
@@ -100,7 +100,7 @@ const sm2 = await factory.createStatemachine(order2);
 
 ## SingleProcessDetector
 
-**Import:** `import { SingleProcessDetector } from 'finita'`
+**Import:** `import { SingleProcessDetector } from '@camcima/finita'`
 
 A process detector that always returns the same process, regardless of the subject.
 
@@ -123,7 +123,7 @@ new SingleProcessDetector(process: ProcessInterface)
 ### Example
 
 ```typescript
-import { SingleProcessDetector, Factory } from "finita";
+import { SingleProcessDetector, Factory } from "@camcima/finita";
 
 const detector = new SingleProcessDetector(orderProcess);
 const factory = new Factory(detector);
@@ -133,7 +133,7 @@ const factory = new Factory(detector);
 
 ## AbstractNamedProcessDetector
 
-**Import:** `import { AbstractNamedProcessDetector } from 'finita'`
+**Import:** `import { AbstractNamedProcessDetector } from '@camcima/finita'`
 
 An abstract base class for process detectors that select a process by name from a registry. Subclasses implement the logic to extract the process name from the subject.
 
@@ -167,7 +167,7 @@ Subclasses must implement this to extract the process name from the subject.
 ### Example
 
 ```typescript
-import { AbstractNamedProcessDetector } from 'finita';
+import { AbstractNamedProcessDetector } from '@camcima/finita';
 
 class OrderProcessDetector extends AbstractNamedProcessDetector {
   protected detectProcessName(subject: unknown): string {
@@ -189,7 +189,7 @@ const sm = await factory.createStatemachine({ paymentType: 'prepayment', ... });
 
 ## StatefulStateNameDetector
 
-**Import:** `import { StatefulStateNameDetector } from 'finita'`
+**Import:** `import { StatefulStateNameDetector } from '@camcima/finita'`
 
 Detects the current state name from subjects that implement `StatefulInterface`.
 
@@ -229,7 +229,7 @@ import {
   StatefulStateNameDetector,
   Factory,
   SingleProcessDetector,
-} from "finita";
+} from "@camcima/finita";
 
 class Order {
   status: string;
@@ -275,8 +275,8 @@ import {
   MutexFactory,
   CallbackCondition,
   CallbackObserver,
-} from "finita";
-import type { LoggerInterface, LockAdapterInterface } from "finita";
+} from "@camcima/finita";
+import type { LoggerInterface, LockAdapterInterface } from "@camcima/finita";
 
 // 1. Define the process
 const draft = new State("draft");

@@ -16,7 +16,7 @@ All filters follow the same pattern: a static `filter()` method that takes an it
 
 ## ActiveTransitionFilter
 
-**Import:** `import { ActiveTransitionFilter } from 'finita'`
+**Import:** `import { ActiveTransitionFilter } from '@camcima/finita'`
 
 Filters transitions to only those that are currently active. This is the core filter used internally by the state machine during transition processing.
 
@@ -45,7 +45,7 @@ static async filter(
 ### Example
 
 ```typescript
-import { ActiveTransitionFilter, Event } from "finita";
+import { ActiveTransitionFilter, Event } from "@camcima/finita";
 
 const event = new Event("approve");
 const activeTransitions = await ActiveTransitionFilter.filter(
@@ -60,7 +60,7 @@ const activeTransitions = await ActiveTransitionFilter.filter(
 
 ## FilterStateByEvent
 
-**Import:** `import { FilterStateByEvent } from 'finita'`
+**Import:** `import { FilterStateByEvent } from '@camcima/finita'`
 
 Filters states that have a specific event registered.
 
@@ -86,7 +86,7 @@ static *filter(
 ### Example
 
 ```typescript
-import { FilterStateByEvent } from "finita";
+import { FilterStateByEvent } from "@camcima/finita";
 
 // Find all states that accept the 'approve' event
 const approvableStates = Array.from(
@@ -102,7 +102,7 @@ for (const state of approvableStates) {
 
 ## FilterStateByTransition
 
-**Import:** `import { FilterStateByTransition } from 'finita'`
+**Import:** `import { FilterStateByTransition } from '@camcima/finita'`
 
 Filters states that have at least one automatic transition (a transition without an event name).
 
@@ -127,7 +127,7 @@ static *filter(
 ### Example
 
 ```typescript
-import { FilterStateByTransition } from "finita";
+import { FilterStateByTransition } from "@camcima/finita";
 
 // Find states with automatic transitions
 const autoStates = Array.from(
@@ -143,7 +143,7 @@ for (const state of autoStates) {
 
 ## FilterStateByFinalState
 
-**Import:** `import { FilterStateByFinalState } from 'finita'`
+**Import:** `import { FilterStateByFinalState } from '@camcima/finita'`
 
 Filters states that have no outgoing transitions. These are terminal (final) states in the workflow.
 
@@ -168,7 +168,7 @@ static *filter(
 ### Example
 
 ```typescript
-import { FilterStateByFinalState } from "finita";
+import { FilterStateByFinalState } from "@camcima/finita";
 
 // Find all terminal states
 const finalStates = Array.from(
@@ -185,7 +185,7 @@ for (const state of finalStates) {
 
 ## FilterTransitionByEvent
 
-**Import:** `import { FilterTransitionByEvent } from 'finita'`
+**Import:** `import { FilterTransitionByEvent } from '@camcima/finita'`
 
 Filters transitions that match a specific event name.
 
@@ -211,7 +211,7 @@ static *filter(
 ### Example
 
 ```typescript
-import { FilterTransitionByEvent } from "finita";
+import { FilterTransitionByEvent } from "@camcima/finita";
 
 // Find all transitions triggered by 'approve'
 for (const state of process.getStates()) {
@@ -233,7 +233,7 @@ for (const state of process.getStates()) {
 Since all filters return iterables, they can be chained:
 
 ```typescript
-import { FilterStateByEvent, FilterStateByTransition } from "finita";
+import { FilterStateByEvent, FilterStateByTransition } from "@camcima/finita";
 
 // States that have the 'process' event AND have automatic transitions
 const eventStates = FilterStateByEvent.filter(process.getStates(), "process");

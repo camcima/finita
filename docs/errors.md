@@ -13,7 +13,7 @@ Custom error classes thrown by the state machine.
 
 ## WrongEventForStateError
 
-**Import:** `import { WrongEventForStateError } from 'finita'`
+**Import:** `import { WrongEventForStateError } from '@camcima/finita'`
 
 Thrown when `triggerEvent()` is called with an event name that doesn't exist on the current state.
 
@@ -29,7 +29,7 @@ Thrown when `triggerEvent()` is called with an event name that doesn't exist on 
 ### Example
 
 ```typescript
-import { WrongEventForStateError } from "finita";
+import { WrongEventForStateError } from "@camcima/finita";
 
 try {
   await statemachine.triggerEvent("nonexistent");
@@ -63,7 +63,7 @@ if (statemachine.getCurrentState().hasEvent("approve")) {
 
 ## LockCanNotBeAcquiredError
 
-**Import:** `import { LockCanNotBeAcquiredError } from 'finita'`
+**Import:** `import { LockCanNotBeAcquiredError } from '@camcima/finita'`
 
 Thrown when the state machine cannot acquire its lock before processing an event or checking transitions.
 
@@ -76,7 +76,7 @@ Thrown when the state machine cannot acquire its lock before processing an event
 ### Example
 
 ```typescript
-import { LockCanNotBeAcquiredError } from "finita";
+import { LockCanNotBeAcquiredError } from "@camcima/finita";
 
 try {
   await statemachine.triggerEvent("process");
@@ -101,7 +101,7 @@ With the default `NullMutex`, this error is never thrown because `acquireLock()`
 
 ## DuplicateStateError
 
-**Import:** `import { DuplicateStateError } from 'finita'`
+**Import:** `import { DuplicateStateError } from '@camcima/finita'`
 
 Thrown when a `StateCollection` or `Process` constructor encounters a different state instance with the same name. Since `Process` is immutable after construction, this error occurs during the constructor's automatic graph discovery when two distinct state objects share a name.
 
@@ -116,7 +116,7 @@ Thrown when a `StateCollection` or `Process` constructor encounters a different 
 ### Example
 
 ```typescript
-import { DuplicateStateError, State, StateCollection } from "finita";
+import { DuplicateStateError, State, StateCollection } from "@camcima/finita";
 
 const collection = new StateCollection();
 collection.addState(new State("open"));

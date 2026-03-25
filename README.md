@@ -37,7 +37,7 @@ This library is a TypeScript port of [metabor/statemachine](https://github.com/M
 ## Installation
 
 ```bash
-npm install finita
+npm install @camcima/finita
 ```
 
 ## Quick Start
@@ -51,7 +51,7 @@ stateDiagram-v2
 ```
 
 ```typescript
-import { State, Transition, Process, Statemachine } from "finita";
+import { State, Transition, Process, Statemachine } from "@camcima/finita";
 
 // Define states
 const draft = new State("draft");

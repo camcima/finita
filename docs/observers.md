@@ -8,7 +8,7 @@ Observers react to events or state changes. There are two contexts where observe
 All observers implement the `Observer` interface:
 
 ```typescript
-import type { MaybePromise } from "finita";
+import type { MaybePromise } from "@camcima/finita";
 
 // MaybePromise<T> = T | Promise<T>
 
@@ -57,7 +57,7 @@ sequenceDiagram
 
 ## CallbackObserver
 
-**Import:** `import { CallbackObserver } from 'finita'`
+**Import:** `import { CallbackObserver } from '@camcima/finita'`
 
 Wraps a plain function as an observer. This is the most common way to attach behavior to events.
 
@@ -91,7 +91,7 @@ import {
   CallbackObserver,
   Statemachine,
   Process,
-} from "finita";
+} from "@camcima/finita";
 
 const draft = new State("draft");
 const published = new State("published");
@@ -132,7 +132,7 @@ For state machine observation, use dedicated observer classes like `StatefulStat
 
 ## StatefulStatusChanger
 
-**Import:** `import { StatefulStatusChanger } from 'finita'`
+**Import:** `import { StatefulStatusChanger } from '@camcima/finita'`
 
 A state machine observer that synchronizes the current state name back to the subject. Designed for subjects that implement `StatefulInterface`.
 
@@ -166,8 +166,8 @@ import {
   Process,
   Statemachine,
   StatefulStatusChanger,
-} from "finita";
-import type { StatefulInterface } from "finita";
+} from "@camcima/finita";
+import type { StatefulInterface } from "@camcima/finita";
 
 class Order implements StatefulInterface {
   status = "new";
@@ -206,7 +206,7 @@ console.log(order.status); // 'shipped'
 
 ## OnEnterObserver
 
-**Import:** `import { OnEnterObserver } from 'finita'`
+**Import:** `import { OnEnterObserver } from '@camcima/finita'`
 
 A state machine observer that triggers a named event on the new state after every state change. This enables "on enter" behavior -- running commands automatically when a state is entered.
 
@@ -240,7 +240,7 @@ import {
   Statemachine,
   CallbackObserver,
   OnEnterObserver,
-} from "finita";
+} from "@camcima/finita";
 
 const pending = new State("pending");
 const approved = new State("approved");
@@ -300,7 +300,7 @@ sm.attach(new OnEnterObserver("initialize"));
 
 ## TransitionLogger
 
-**Import:** `import { TransitionLogger } from 'finita'`
+**Import:** `import { TransitionLogger } from '@camcima/finita'`
 
 A state machine observer that logs every state change to a `LoggerInterface`.
 
@@ -359,8 +359,8 @@ The logger also receives a context object:
 ### Example
 
 ```typescript
-import { TransitionLogger } from "finita";
-import type { LoggerInterface } from "finita";
+import { TransitionLogger } from "@camcima/finita";
+import type { LoggerInterface } from "@camcima/finita";
 
 // Simple console logger
 const logger: LoggerInterface = {
@@ -398,8 +398,12 @@ sm.attach(new TransitionLogger(logger));
 Attach behavior to specific events on specific states:
 
 ```typescript
-import type { Observer, ObservableSubject, MaybePromise } from "finita";
-import type { EventInterface } from "finita";
+import type {
+  Observer,
+  ObservableSubject,
+  MaybePromise,
+} from "@camcima/finita";
+import type { EventInterface } from "@camcima/finita";
 
 class SendEmailCommand implements Observer {
   update(subject: ObservableSubject): MaybePromise<void> {

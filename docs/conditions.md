@@ -3,7 +3,7 @@
 Conditions (also called guards) control whether a transition is active. Every condition implements the `ConditionInterface`:
 
 ```typescript
-import type { MaybePromise } from "finita";
+import type { MaybePromise } from "@camcima/finita";
 
 // MaybePromise<T> = T | Promise<T>
 
@@ -73,7 +73,7 @@ classDiagram
 
 ## Tautology
 
-**Import:** `import { Tautology } from 'finita'`
+**Import:** `import { Tautology } from '@camcima/finita'`
 
 A condition that always returns `true`. Useful as a default/placeholder condition or for automatic transitions that should always fire.
 
@@ -90,7 +90,7 @@ new Tautology(name?: string)
 ### Example
 
 ```typescript
-import { Tautology, Transition, State } from "finita";
+import { Tautology, Transition, State } from "@camcima/finita";
 
 const always = new Tautology("always proceed");
 const s1 = new State("s1");
@@ -104,7 +104,7 @@ s1.addTransition(new Transition(s2, null, always));
 
 ## Contradiction
 
-**Import:** `import { Contradiction } from 'finita'`
+**Import:** `import { Contradiction } from '@camcima/finita'`
 
 A condition that always returns `false`. Useful for temporarily disabling transitions or as a base case in composite conditions.
 
@@ -121,7 +121,7 @@ new Contradiction(name?: string)
 ### Example
 
 ```typescript
-import { Contradiction, Transition, State } from "finita";
+import { Contradiction, Transition, State } from "@camcima/finita";
 
 const never = new Contradiction("blocked");
 const s1 = new State("s1");
@@ -135,7 +135,7 @@ s1.addTransition(new Transition(s2, "go", never));
 
 ## CallbackCondition
 
-**Import:** `import { CallbackCondition } from 'finita'`
+**Import:** `import { CallbackCondition } from '@camcima/finita'`
 
 Wraps a function as a condition. This is the most common way to create custom guards.
 
@@ -153,7 +153,7 @@ new CallbackCondition(name: string, callable: ConditionCallbackFn)
 ### Example
 
 ```typescript
-import { CallbackCondition, Transition, State } from "finita";
+import { CallbackCondition, Transition, State } from "@camcima/finita";
 
 // Check subject property
 const isApproved = new CallbackCondition("isApproved", (subject) => {
@@ -185,7 +185,7 @@ type ConditionCallbackFn = (
 
 ## Timeout
 
-**Import:** `import { Timeout } from 'finita'`
+**Import:** `import { Timeout } from '@camcima/finita'`
 
 A time-based condition that returns `true` when a specified duration has elapsed since the subject's last state change. The subject must implement `LastStateHasChangedDateInterface`.
 
@@ -213,7 +213,7 @@ If the subject does not implement this interface, `checkCondition()` throws an e
 ### Example
 
 ```typescript
-import { Timeout, Transition, State } from "finita";
+import { Timeout, Transition, State } from "@camcima/finita";
 
 // Transition fires 24 hours after entering the current state
 const dayTimeout = new Timeout(24 * 60 * 60 * 1000, "24 hours");
@@ -238,7 +238,7 @@ The condition calculates `lastStateChangedDate + timeoutMs` and returns `true` i
 
 ## AndComposite
 
-**Import:** `import { AndComposite } from 'finita'`
+**Import:** `import { AndComposite } from '@camcima/finita'`
 
 Combines multiple conditions with logical AND. Returns `true` only if **all** conditions are `true`. Short-circuits on the first `false`.
 
@@ -259,7 +259,7 @@ new AndComposite(condition: ConditionInterface)
 ### Example
 
 ```typescript
-import { AndComposite, CallbackCondition } from "finita";
+import { AndComposite, CallbackCondition } from "@camcima/finita";
 
 const isActive = new CallbackCondition("isActive", (s) => (s as any).active);
 const isPaid = new CallbackCondition("isPaid", (s) => (s as any).paid);
@@ -274,7 +274,7 @@ console.log(canShip.getName()); // '(isActive and isPaid)'
 
 ## OrComposite
 
-**Import:** `import { OrComposite } from 'finita'`
+**Import:** `import { OrComposite } from '@camcima/finita'`
 
 Combines multiple conditions with logical OR. Returns `true` if **any** condition is `true`. Short-circuits on the first `true`.
 
@@ -295,7 +295,7 @@ new OrComposite(condition: ConditionInterface)
 ### Example
 
 ```typescript
-import { OrComposite, CallbackCondition } from "finita";
+import { OrComposite, CallbackCondition } from "@camcima/finita";
 
 const isAdmin = new CallbackCondition(
   "isAdmin",
@@ -313,7 +313,7 @@ console.log(canEdit.getName()); // '(isAdmin or isOwner)'
 
 ## Not
 
-**Import:** `import { Not } from 'finita'`
+**Import:** `import { Not } from '@camcima/finita'`
 
 Negates another condition. Returns `true` when the inner condition returns `false`, and vice versa.
 
@@ -333,7 +333,7 @@ new Not(condition: ConditionInterface)
 ### Example
 
 ```typescript
-import { Not, CallbackCondition, Transition, State } from "finita";
+import { Not, CallbackCondition, Transition, State } from "@camcima/finita";
 
 const isExpired = new CallbackCondition("isExpired", (s) => (s as any).expired);
 const isNotExpired = new Not(isExpired);
@@ -351,7 +351,7 @@ active.addTransition(new Transition(renewed, "renew", isNotExpired));
 You can create your own condition classes by implementing `ConditionInterface`:
 
 ```typescript
-import type { ConditionInterface, MaybePromise } from "finita";
+import type { ConditionInterface, MaybePromise } from "@camcima/finita";
 
 class MinimumBalance implements ConditionInterface {
   private readonly minimum: number;

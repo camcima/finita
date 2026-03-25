@@ -11,7 +11,7 @@ Utility classes for building and merging state machine definitions.
 
 ## SetupHelper
 
-**Import:** `import { SetupHelper } from 'finita'`
+**Import:** `import { SetupHelper } from '@camcima/finita'`
 
 A fluent helper for building state machine definitions from configuration data. Instead of manually creating `State` and `Transition` objects, the `SetupHelper` lets you define transitions by name and it handles object creation and deduplication.
 
@@ -52,7 +52,7 @@ import {
   StateCollection,
   Process,
   CallbackObserver,
-} from "finita";
+} from "@camcima/finita";
 
 const collection = new StateCollection();
 const helper = new SetupHelper(collection);
@@ -129,7 +129,7 @@ const process = new Process("myProcess", collection.getState("initial"));
 
 ## StateCollectionMerger
 
-**Import:** `import { StateCollectionMerger } from 'finita'`
+**Import:** `import { StateCollectionMerger } from '@camcima/finita'`
 
 Merges states, transitions, events, observers, and metadata from a source collection into a target collection. Creates **new** state and transition objects in the target -- they are equal to but not the same instances as the source.
 
@@ -171,7 +171,7 @@ import {
   StateCollection,
   State,
   Transition,
-} from "finita";
+} from "@camcima/finita";
 
 const source = new StateCollection();
 const s1 = new State("open");

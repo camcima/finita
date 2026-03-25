@@ -13,7 +13,7 @@ The graph module builds a plain data structure representing the state machine as
 
 ## GraphBuilder
 
-**Import:** `import { GraphBuilder } from 'finita'`
+**Import:** `import { GraphBuilder } from '@camcima/finita'`
 
 Builds a `Graph` data structure from states and their transitions.
 
@@ -61,7 +61,7 @@ import {
   Transition,
   Process,
   CallbackCondition,
-} from "finita";
+} from "@camcima/finita";
 
 const draft = new State("draft");
 const review = new State("review");
@@ -140,7 +140,7 @@ interface GraphEdge {
 }
 ```
 
-**Import types:** `import type { Graph, GraphNode, GraphEdge } from 'finita'`
+**Import types:** `import type { Graph, GraphNode, GraphEdge } from '@camcima/finita'`
 
 ---
 
@@ -181,7 +181,7 @@ digraph {
 }
 ```
 
-**Import types:** `import type { DotOptions } from 'finita'`
+**Import types:** `import type { DotOptions } from '@camcima/finita'`
 
 ---
 
@@ -222,7 +222,7 @@ stateDiagram-v2
   s_review --> s_draft : E: reject / W: 1
 ```
 
-**Import types:** `import type { MermaidOptions } from 'finita'`
+**Import types:** `import type { MermaidOptions } from '@camcima/finita'`
 
 ---
 

@@ -16,7 +16,7 @@ The core module contains the fundamental building blocks of the state machine: s
 
 ## State
 
-**Import:** `import { State } from 'finita'`
+**Import:** `import { State } from '@camcima/finita'`
 
 A state represents a named node in the workflow graph. Each state can hold outgoing transitions, named events, and arbitrary metadata.
 
@@ -49,7 +49,7 @@ new State(name: string)
 ### Example
 
 ```typescript
-import { State, Transition } from "finita";
+import { State, Transition } from "@camcima/finita";
 
 const open = new State("open");
 const closed = new State("closed");
@@ -81,7 +81,7 @@ console.log(open.hasEvent("myEvent")); // true
 
 ## Transition
 
-**Import:** `import { Transition } from 'finita'`
+**Import:** `import { Transition } from '@camcima/finita'`
 
 A transition represents a directed edge from one state to another. It can optionally be associated with an event name and a condition (guard).
 
@@ -166,7 +166,7 @@ urgentTransition.setWeight(10);
 
 ## Event
 
-**Import:** `import { Event } from 'finita'`
+**Import:** `import { Event } from '@camcima/finita'`
 
 An event is a named trigger that notifies attached observers when invoked. Events implement the Observer pattern and carry invoke arguments and metadata.
 
@@ -205,7 +205,7 @@ When `invoke()` is called:
 ### Example
 
 ```typescript
-import { Event, CallbackObserver } from "finita";
+import { Event, CallbackObserver } from "@camcima/finita";
 
 const event = new Event("userRegistered");
 
@@ -230,7 +230,7 @@ event.attach(
 
 ## Process
 
-**Import:** `import { Process } from 'finita'`
+**Import:** `import { Process } from '@camcima/finita'`
 
 A process defines a complete workflow as a named collection of states. It auto-discovers all reachable states by walking the transition graph from the initial state.
 
@@ -294,7 +294,7 @@ new Process("test", s1); // Error: There is already a different state with name 
 
 ## Statemachine
 
-**Import:** `import { Statemachine } from 'finita'`
+**Import:** `import { Statemachine } from '@camcima/finita'`
 
 The state machine is the runtime orchestrator. It tracks the current state, processes events, evaluates conditions, manages locks, and notifies observers.
 
@@ -430,7 +430,7 @@ await sm.releaseLock();
 
 ## Dispatcher
 
-**Import:** `import { Dispatcher } from 'finita'`
+**Import:** `import { Dispatcher } from '@camcima/finita'`
 
 The dispatcher queues events and their arguments for deferred invocation. It is used internally by the state machine to separate event dispatching from event execution.
 
@@ -451,7 +451,7 @@ new Dispatcher();
 ### Example
 
 ```typescript
-import { Dispatcher, Event, CallbackObserver } from "finita";
+import { Dispatcher, Event, CallbackObserver } from "@camcima/finita";
 
 const event = new Event("test");
 event.attach(new CallbackObserver((...args) => console.log("fired:", args)));
@@ -468,7 +468,7 @@ await dispatcher.invoke();
 
 ## StateCollection
 
-**Import:** `import { StateCollection } from 'finita'`
+**Import:** `import { StateCollection } from '@camcima/finita'`
 
 A mutable, named collection of states. Used as a building block for `Process` and `SetupHelper`.
 
@@ -492,7 +492,7 @@ new StateCollection();
 ### Example
 
 ```typescript
-import { StateCollection, State, Transition } from "finita";
+import { StateCollection, State, Transition } from "@camcima/finita";
 
 const collection = new StateCollection();
 collection.addState(new State("open"));
