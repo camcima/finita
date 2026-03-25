@@ -7,9 +7,9 @@ import type { MaybePromise } from "@camcima/finita";
 
 // MaybePromise<T> = T | Promise<T>
 
-interface ConditionInterface extends Named {
+interface ConditionInterface<TSubject = unknown> extends Named {
   checkCondition(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
   ): MaybePromise<boolean>;
 }
@@ -142,25 +142,31 @@ Wraps a function as a condition. This is the most common way to create custom gu
 ### Constructor
 
 ```typescript
-new CallbackCondition(name: string, callable: ConditionCallbackFn)
+new CallbackCondition<TSubject = unknown>(name: string, callable: ConditionCallbackFn<TSubject>)
 ```
 
-| Parameter  | Type                                                                         | Description                                                              |
-| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `name`     | `string`                                                                     | The condition name (used as identity for deduplication and graph labels) |
-| `callable` | `(subject: unknown, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                                       |
+| Parameter  | Type                                                                           | Description                                                              |
+| ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `name`     | `string`                                                                       | The condition name (used as identity for deduplication and graph labels) |
+| `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                                       |
 
 ### Example
 
 ```typescript
 import { CallbackCondition, Transition, State } from "@camcima/finita";
 
-// Check subject property
-const isApproved = new CallbackCondition("isApproved", (subject) => {
-  return (subject as Order).approved === true;
-});
+interface Order {
+  approved: boolean;
+  total: number;
+}
 
-// Check context value
+// Type-safe: subject is typed as Order -- no cast needed
+const isApproved = new CallbackCondition<Order>(
+  "isApproved",
+  (order) => order.approved === true,
+);
+
+// Check context value (untyped -- works without a type parameter)
 const hasPriority = new CallbackCondition(
   "hasPriority",
   (_subject, context) => {
@@ -175,8 +181,8 @@ pending.addTransition(new Transition(approved, "submit", isApproved));
 ### Type: `ConditionCallbackFn`
 
 ```typescript
-type ConditionCallbackFn = (
-  subject: unknown,
+type ConditionCallbackFn<TSubject = unknown> = (
+  subject: TSubject,
   context: Map<string, unknown>,
 ) => MaybePromise<boolean>;
 ```
@@ -245,7 +251,7 @@ Combines multiple conditions with logical AND. Returns `true` only if **all** co
 ### Constructor
 
 ```typescript
-new AndComposite(condition: ConditionInterface)
+new AndComposite<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 ```
 
 ### Methods
@@ -281,7 +287,7 @@ Combines multiple conditions with logical OR. Returns `true` if **any** conditio
 ### Constructor
 
 ```typescript
-new OrComposite(condition: ConditionInterface)
+new OrComposite<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 ```
 
 ### Methods
@@ -320,7 +326,7 @@ Negates another condition. Returns `true` when the inner condition returns `fals
 ### Constructor
 
 ```typescript
-new Not(condition: ConditionInterface)
+new Not<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 ```
 
 ### Methods
@@ -353,7 +359,11 @@ You can create your own condition classes by implementing `ConditionInterface`:
 ```typescript
 import type { ConditionInterface, MaybePromise } from "@camcima/finita";
 
-class MinimumBalance implements ConditionInterface {
+interface Account {
+  balance: number;
+}
+
+class MinimumBalance implements ConditionInterface<Account> {
   private readonly minimum: number;
 
   constructor(minimum: number) {
@@ -365,11 +375,10 @@ class MinimumBalance implements ConditionInterface {
   }
 
   checkCondition(
-    subject: unknown,
+    subject: Account,
     context: Map<string, unknown>,
   ): MaybePromise<boolean> {
-    const account = subject as { balance: number };
-    return account.balance >= this.minimum;
+    return subject.balance >= this.minimum; // subject is typed as Account
   }
 }
 

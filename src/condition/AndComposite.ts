@@ -1,13 +1,15 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 
-export class AndComposite implements ConditionInterface {
-  private readonly conditions: ConditionInterface[] = [];
+export class AndComposite<TSubject = unknown>
+  implements ConditionInterface<TSubject>
+{
+  private readonly conditions: ConditionInterface<TSubject>[] = [];
 
-  constructor(condition: ConditionInterface) {
+  constructor(condition: ConditionInterface<TSubject>) {
     this.conditions.push(condition);
   }
 
-  addAnd(condition: ConditionInterface): this {
+  addAnd(condition: ConditionInterface<TSubject>): this {
     this.conditions.push(condition);
     return this;
   }
@@ -18,7 +20,7 @@ export class AndComposite implements ConditionInterface {
   }
 
   async checkCondition(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
   ): Promise<boolean> {
     for (const condition of this.conditions) {

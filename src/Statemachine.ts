@@ -15,12 +15,14 @@ import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 
-export class Statemachine implements StatemachineInterface {
-  private readonly subject: unknown;
+export class Statemachine<TSubject = unknown>
+  implements StatemachineInterface<TSubject>
+{
+  private readonly subject: TSubject;
   private currentState: StateInterface;
   private lastState: StateInterface | null = null;
-  private readonly transitionSelector: TransitionSelectorInterface;
-  private selectedTransition: TransitionInterface | null = null;
+  private readonly transitionSelector: TransitionSelectorInterface<TSubject>;
+  private selectedTransition: TransitionInterface<TSubject> | null = null;
   private readonly process: ProcessInterface;
   private readonly mutex: MutexInterface;
   private autoreleaseLock = true;
@@ -30,10 +32,10 @@ export class Statemachine implements StatemachineInterface {
   private readonly observers: Set<Observer> = new Set();
 
   constructor(
-    subject: unknown,
+    subject: TSubject,
     process: ProcessInterface,
     stateName?: string | null,
-    transitionSelector?: TransitionSelectorInterface | null,
+    transitionSelector?: TransitionSelectorInterface<TSubject> | null,
     mutex?: MutexInterface | null,
   ) {
     this.subject = subject;
@@ -60,11 +62,11 @@ export class Statemachine implements StatemachineInterface {
     return this.lastState;
   }
 
-  getSubject(): unknown {
+  getSubject(): TSubject {
     return this.subject;
   }
 
-  getSelectedTransition(): TransitionInterface | null {
+  getSelectedTransition(): TransitionInterface<TSubject> | null {
     return this.selectedTransition;
   }
 

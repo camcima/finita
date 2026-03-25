@@ -1,9 +1,11 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 
-export class Not implements ConditionInterface {
-  private readonly condition: ConditionInterface;
+export class Not<TSubject = unknown>
+  implements ConditionInterface<TSubject>
+{
+  private readonly condition: ConditionInterface<TSubject>;
 
-  constructor(condition: ConditionInterface) {
+  constructor(condition: ConditionInterface<TSubject>) {
     this.condition = condition;
   }
 
@@ -12,7 +14,7 @@ export class Not implements ConditionInterface {
   }
 
   async checkCondition(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
   ): Promise<boolean> {
     return !(await this.condition.checkCondition(subject, context));

@@ -1,5 +1,5 @@
 import type { ProcessInterface } from "./ProcessInterface.js";
 
-export interface ProcessDetectorInterface {
-  detectProcess(subject: unknown): ProcessInterface;
+export interface ProcessDetectorInterface<TSubject = unknown> {
+  detectProcess(subject: TSubject): ProcessInterface;
 }

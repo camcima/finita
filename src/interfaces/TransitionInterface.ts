@@ -3,13 +3,13 @@ import type { StateInterface } from "./StateInterface.js";
 import type { EventInterface } from "./EventInterface.js";
 import type { ConditionInterface } from "./ConditionInterface.js";
 
-export interface TransitionInterface extends Weighted {
+export interface TransitionInterface<TSubject = unknown> extends Weighted {
   getTargetState(): StateInterface;
   getEventName(): string | null;
   getConditionName(): string | null;
-  getCondition(): ConditionInterface | null;
+  getCondition(): ConditionInterface<TSubject> | null;
   isActive(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
     event?: EventInterface,
   ): Promise<boolean>;

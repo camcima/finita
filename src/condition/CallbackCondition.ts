@@ -1,16 +1,18 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 import type { MaybePromise } from "../MaybePromise.js";
 
-export type ConditionCallbackFn = (
-  subject: unknown,
+export type ConditionCallbackFn<TSubject = unknown> = (
+  subject: TSubject,
   context: Map<string, unknown>,
 ) => MaybePromise<boolean>;
 
-export class CallbackCondition implements ConditionInterface {
+export class CallbackCondition<TSubject = unknown>
+  implements ConditionInterface<TSubject>
+{
   private readonly name: string;
-  private readonly callable: ConditionCallbackFn;
+  private readonly callable: ConditionCallbackFn<TSubject>;
 
-  constructor(name: string, callable: ConditionCallbackFn) {
+  constructor(name: string, callable: ConditionCallbackFn<TSubject>) {
     this.name = name;
     this.callable = callable;
   }
@@ -20,7 +22,7 @@ export class CallbackCondition implements ConditionInterface {
   }
 
   checkCondition(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
   ): MaybePromise<boolean> {
     return this.callable(subject, context);

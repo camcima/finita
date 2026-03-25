@@ -31,7 +31,7 @@ describe("StatefulStateNameDetector", () => {
 
   it("should throw for non-stateful subject", () => {
     const detector = new StatefulStateNameDetector();
-    expect(() => detector.detectCurrentStateName({})).toThrow(
+    expect(() => detector.detectCurrentStateName({} as never)).toThrow(
       "StatefulInterface",
     );
   });
@@ -159,7 +159,7 @@ describe("StatefulStateNameDetector (PHP-ported)", () => {
 
   it("should throw if object is not stateful", () => {
     const detector = new StatefulStateNameDetector();
-    expect(() => detector.detectCurrentStateName({})).toThrow();
+    expect(() => detector.detectCurrentStateName({} as never)).toThrow();
   });
 });
 

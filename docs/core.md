@@ -88,18 +88,18 @@ A transition represents a directed edge from one state to another. It can option
 ### Constructor
 
 ```typescript
-new Transition(
+new Transition<TSubject = unknown>(
   targetState: StateInterface,
   eventName?: string | null,
-  condition?: ConditionInterface | null
+  condition?: ConditionInterface<TSubject> | null
 )
 ```
 
-| Parameter     | Type                         | Default    | Description                                                                       |
-| ------------- | ---------------------------- | ---------- | --------------------------------------------------------------------------------- |
-| `targetState` | `StateInterface`             | (required) | The state to transition to                                                        |
-| `eventName`   | `string \| null`             | `null`     | The event that triggers this transition. `null` makes it an automatic transition. |
-| `condition`   | `ConditionInterface \| null` | `null`     | A guard condition that must be `true` for the transition to be active             |
+| Parameter     | Type                                  | Default    | Description                                                                       |
+| ------------- | ------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
+| `targetState` | `StateInterface`                      | (required) | The state to transition to                                                        |
+| `eventName`   | `string \| null`                      | `null`     | The event that triggers this transition. `null` makes it an automatic transition. |
+| `condition`   | `ConditionInterface<TSubject> \| null` | `null`     | A guard condition that must be `true` for the transition to be active             |
 
 ### Methods
 
@@ -108,7 +108,7 @@ new Transition(
 | `getTargetState()`                   | `StateInterface`             | Returns the target state                                    |
 | `getEventName()`                     | `string \| null`             | Returns the event name, or `null` for automatic transitions |
 | `getConditionName()`                 | `string \| null`             | Returns the condition name, or `null` if no condition       |
-| `getCondition()`                     | `ConditionInterface \| null` | Returns the condition object                                |
+| `getCondition()`                     | `ConditionInterface<TSubject> \| null` | Returns the condition object                                |
 | `isActive(subject, context, event?)` | `Promise<boolean>`           | Determines if this transition is currently active           |
 | `getWeight()`                        | `number`                     | Returns the weight (default: `1`)                           |
 | `setWeight(weight)`                  | `void`                       | Sets the weight                                             |
@@ -301,22 +301,22 @@ The state machine is the runtime orchestrator. It tracks the current state, proc
 ### Constructor
 
 ```typescript
-new Statemachine(
-  subject: unknown,
+new Statemachine<TSubject = unknown>(
+  subject: TSubject,
   process: ProcessInterface,
   stateName?: string | null,
-  transitionSelector?: TransitionSelectorInterface | null,
+  transitionSelector?: TransitionSelectorInterface<TSubject> | null,
   mutex?: MutexInterface | null
 )
 ```
 
-| Parameter            | Type                                  | Default    | Description                                                                               |
-| -------------------- | ------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `subject`            | `unknown`                             | (required) | The domain object being managed (e.g., an Order, Article, etc.)                           |
-| `process`            | `ProcessInterface`                    | (required) | The process defining the workflow                                                         |
-| `stateName`          | `string \| null`                      | `null`     | Optional initial state name. If `null`, uses `process.getInitialState()`.                 |
-| `transitionSelector` | `TransitionSelectorInterface \| null` | `null`     | Strategy for selecting among active transitions. Defaults to `OneOrNoneActiveTransition`. |
-| `mutex`              | `MutexInterface \| null`              | `null`     | Mutex for concurrency control. Defaults to `NullMutex`.                                   |
+| Parameter            | Type                                           | Default    | Description                                                                               |
+| -------------------- | ---------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `subject`            | `TSubject`                                     | (required) | The domain object being managed (e.g., an Order, Article, etc.)                           |
+| `process`            | `ProcessInterface`                             | (required) | The process defining the workflow                                                         |
+| `stateName`          | `string \| null`                               | `null`     | Optional initial state name. If `null`, uses `process.getInitialState()`.                 |
+| `transitionSelector` | `TransitionSelectorInterface<TSubject> \| null` | `null`     | Strategy for selecting among active transitions. Defaults to `OneOrNoneActiveTransition`. |
+| `mutex`              | `MutexInterface \| null`                       | `null`     | Mutex for concurrency control. Defaults to `NullMutex`.                                   |
 
 ### Methods
 
@@ -324,9 +324,9 @@ new Statemachine(
 | ------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------ |
 | `getCurrentState()`                         | `StateInterface`               | Returns the current state                                                |
 | `getLastState()`                            | `StateInterface \| null`       | Returns the previous state (only available during observer notification) |
-| `getSubject()`                              | `unknown`                      | Returns the managed subject                                              |
+| `getSubject()`                              | `TSubject`                     | Returns the managed subject                                              |
 | `getProcess()`                              | `ProcessInterface`             | Returns the process                                                      |
-| `getSelectedTransition()`                   | `TransitionInterface \| null`  | Returns the transition being executed (only during notification)         |
+| `getSelectedTransition()`                   | `TransitionInterface<TSubject> \| null`  | Returns the transition being executed (only during notification)         |
 | `getCurrentContext()`                       | `Map<string, unknown> \| null` | Returns the current context (only during event processing)               |
 | `triggerEvent(name, context?)`              | `Promise<void>`                | Triggers a named event on the current state                              |
 | `checkTransitions(context?)`                | `Promise<void>`                | Evaluates automatic transitions                                          |
@@ -425,6 +425,46 @@ await sm.triggerEvent("step1");
 await sm.triggerEvent("step2");
 await sm.releaseLock();
 ```
+
+### Typed Usage
+
+The `Statemachine` class accepts a `TSubject` generic parameter, giving you type-safe access to the subject without casts:
+
+```typescript
+import {
+  State,
+  Transition,
+  Process,
+  Statemachine,
+  CallbackCondition,
+} from "@camcima/finita";
+
+interface Order {
+  id: number;
+  total: number;
+  status: string;
+}
+
+const pending = new State("pending");
+const approved = new State("approved");
+
+const canApprove = new CallbackCondition<Order>(
+  "canApprove",
+  (order) => order.total <= 1000, // order is typed as Order -- no cast needed
+);
+pending.addTransition(new Transition(approved, "review", canApprove));
+
+const process = new Process("order", pending);
+const order: Order = { id: 1, total: 500, status: "pending" };
+const sm = new Statemachine<Order>(order, process);
+
+const subject = sm.getSubject(); // typed as Order
+console.log(subject.total); // 500 -- no cast needed
+```
+
+All generics default to `unknown`, so existing untyped code continues to work unchanged.
+
+> **Limitation:** The `TSubject` generic lives on `Statemachine`, `Transition`, `CallbackCondition`, `Factory`, and related classes — but **not** on `State` or `Process`. This means TypeScript cannot prevent mixing transitions with different subject types in the same state graph. For example, adding both a `Transition<Order>` and a `Transition<User>` to the same `State` compiles without error. Parameterizing `State` and `Process` would require every `new State<Order>("name")` to carry the generic, significantly degrading construction ergonomics for marginal safety gain. In practice, each process graph serves a single subject type, and mismatches surface immediately at runtime.
 
 ---
 

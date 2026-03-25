@@ -2,14 +2,19 @@ import type { TransitionSelectorInterface } from "../interfaces/TransitionSelect
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import { OneOrNoneActiveTransition } from "./OneOrNoneActiveTransition.js";
 
-export class ScoreTransition implements TransitionSelectorInterface {
-  private readonly innerSelector: TransitionSelectorInterface;
+export class ScoreTransition<TSubject = unknown>
+  implements TransitionSelectorInterface<TSubject>
+{
+  private readonly innerSelector: TransitionSelectorInterface<TSubject>;
 
-  constructor(innerSelector?: TransitionSelectorInterface) {
-    this.innerSelector = innerSelector ?? new OneOrNoneActiveTransition();
+  constructor(innerSelector?: TransitionSelectorInterface<TSubject>) {
+    this.innerSelector =
+      innerSelector ?? new OneOrNoneActiveTransition<TSubject>();
   }
 
-  protected calculateScore(transition: TransitionInterface): number {
+  protected calculateScore(
+    transition: TransitionInterface<TSubject>,
+  ): number {
     let score = 0;
     if (transition.getEventName()) {
       score += 2;
@@ -21,9 +26,9 @@ export class ScoreTransition implements TransitionSelectorInterface {
   }
 
   selectTransition(
-    transitions: Iterable<TransitionInterface>,
-  ): TransitionInterface | null {
-    let bestTransitions: TransitionInterface[] = [];
+    transitions: Iterable<TransitionInterface<TSubject>>,
+  ): TransitionInterface<TSubject> | null {
+    let bestTransitions: TransitionInterface<TSubject>[] = [];
     let bestScore = -1;
     for (const transition of transitions) {
       const score = this.calculateScore(transition);

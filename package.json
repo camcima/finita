@@ -1,6 +1,6 @@
 {
   "name": "@camcima/finita",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A full-featured finite state machine library for TypeScript",
   "type": "module",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --reporter=default --reporter=junit --outputFile=test-report.junit.xml",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit && eslint src/ tests/",
+    "lint": "tsc --noEmit && tsc --project tsconfig.test.json && eslint src/ tests/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "release": "release-it"

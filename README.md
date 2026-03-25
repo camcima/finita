@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/camcima/finita/actions/workflows/ci.yml/badge.svg)](https://github.com/camcima/finita/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/camcima/finita/graph/badge.svg)](https://codecov.io/gh/camcima/finita)
-[![npm version](https://img.shields.io/npm/v/finita)](https://www.npmjs.com/package/finita)
+[![npm version](https://img.shields.io/npm/v/@camcima/finita)](https://www.npmjs.com/package/@camcima/finita)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18%20%7C%2020%20%7C%2022-green.svg)](https://nodejs.org/)
@@ -21,6 +21,7 @@ This library is a TypeScript port of [metabor/statemachine](https://github.com/M
 
 ## Features
 
+- **Type-Safe Subjects** -- generic `TSubject` parameter gives you typed access to the domain object, with `unknown` default for backward compatibility
 - **Async-First** -- all conditions, observers, and mutexes support async operations via `MaybePromise<T>` return types
 - **States, Transitions, Events** -- define complex workflows declaratively
 - **Conditions (Guards)** -- control when transitions are allowed, with composable AND/OR/NOT logic
@@ -77,6 +78,41 @@ await sm.triggerEvent("archive");
 console.log(sm.getCurrentState().getName()); // 'archived'
 
 // Note: use top-level await (supported in ES modules) or wrap in an async function.
+```
+
+### Typed Usage
+
+Use the `TSubject` generic parameter for type-safe access to your domain object -- no more casts:
+
+```typescript
+import {
+  State,
+  Transition,
+  Process,
+  Statemachine,
+  CallbackCondition,
+} from "@camcima/finita";
+
+interface Order {
+  id: number;
+  total: number;
+}
+
+const pending = new State("pending");
+const approved = new State("approved");
+
+// subject is typed as Order -- no cast needed
+const canApprove = new CallbackCondition<Order>(
+  "canApprove",
+  (order) => order.total <= 1000,
+);
+pending.addTransition(new Transition(approved, "review", canApprove));
+
+const process = new Process("order", pending);
+const sm = new Statemachine<Order>({ id: 1, total: 500 }, process);
+
+const order = sm.getSubject(); // typed as Order
+console.log(order.total); // 500
 ```
 
 ## Concepts

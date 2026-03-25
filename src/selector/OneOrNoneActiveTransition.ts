@@ -1,10 +1,12 @@
 import type { TransitionSelectorInterface } from "../interfaces/TransitionSelectorInterface.js";
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 
-export class OneOrNoneActiveTransition implements TransitionSelectorInterface {
+export class OneOrNoneActiveTransition<TSubject = unknown>
+  implements TransitionSelectorInterface<TSubject>
+{
   selectTransition(
-    transitions: Iterable<TransitionInterface>,
-  ): TransitionInterface | null {
+    transitions: Iterable<TransitionInterface<TSubject>>,
+  ): TransitionInterface<TSubject> | null {
     const arr = Array.from(transitions);
     switch (arr.length) {
       case 0:

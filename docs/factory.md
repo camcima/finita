@@ -47,22 +47,22 @@ flowchart TD
 ### Constructor
 
 ```typescript
-new Factory(
-  processDetector: ProcessDetectorInterface,
-  stateNameDetector?: StateNameDetectorInterface | null
+new Factory<TSubject = unknown>(
+  processDetector: ProcessDetectorInterface<TSubject>,
+  stateNameDetector?: StateNameDetectorInterface<TSubject> | null
 )
 ```
 
-| Parameter           | Type                                 | Default    | Description                                                               |
-| ------------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------- |
-| `processDetector`   | `ProcessDetectorInterface`           | (required) | Determines which process to use for the subject                           |
-| `stateNameDetector` | `StateNameDetectorInterface \| null` | `null`     | Detects the current state from the subject (for restoring state machines) |
+| Parameter           | Type                                          | Default    | Description                                                               |
+| ------------------- | --------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `processDetector`   | `ProcessDetectorInterface<TSubject>`          | (required) | Determines which process to use for the subject                           |
+| `stateNameDetector` | `StateNameDetectorInterface<TSubject> \| null` | `null`     | Detects the current state from the subject (for restoring state machines) |
 
 ### Methods
 
 | Method                                 | Return Type                      | Description                                                    |
 | -------------------------------------- | -------------------------------- | -------------------------------------------------------------- |
-| `createStatemachine(subject)`          | `Promise<StatemachineInterface>` | Creates a fully configured state machine for the subject       |
+| `createStatemachine(subject)`          | `Promise<StatemachineInterface<TSubject>>` | Creates a fully configured state machine for the subject       |
 | `setMutexFactory(factory)`             | `void`                           | Sets the mutex factory for concurrency control                 |
 | `setTransitionSelector(selector)`      | `void`                           | Sets the transition selector strategy                          |
 | `attachStatemachineObserver(observer)` | `void`                           | Registers an observer to attach to every created state machine |
@@ -159,7 +159,7 @@ constructor();
 ### Abstract Method
 
 ```typescript
-protected abstract detectProcessName(subject: unknown): string;
+protected abstract detectProcessName(subject: TSubject): string;
 ```
 
 Subclasses must implement this to extract the process name from the subject.
@@ -169,9 +169,13 @@ Subclasses must implement this to extract the process name from the subject.
 ```typescript
 import { AbstractNamedProcessDetector } from '@camcima/finita';
 
-class OrderProcessDetector extends AbstractNamedProcessDetector {
-  protected detectProcessName(subject: unknown): string {
-    return (subject as Order).paymentType; // 'prepayment' or 'postpayment'
+interface Order {
+  paymentType: string;
+}
+
+class OrderProcessDetector extends AbstractNamedProcessDetector<Order> {
+  protected detectProcessName(subject: Order): string {
+    return subject.paymentType; // 'prepayment' or 'postpayment' -- no cast needed
   }
 }
 
@@ -258,7 +262,7 @@ console.log(sm.getCurrentState().getName()); // 'shipped'
 
 ## Complete Example
 
-Putting it all together -- a production-ready factory setup:
+Putting it all together -- a production-ready factory setup with typed generics:
 
 ```typescript
 import {
@@ -276,7 +280,17 @@ import {
   CallbackCondition,
   CallbackObserver,
 } from "@camcima/finita";
-import type { LoggerInterface, LockAdapterInterface } from "@camcima/finita";
+import type {
+  LoggerInterface,
+  LockAdapterInterface,
+  StatefulInterface,
+} from "@camcima/finita";
+
+interface Article extends StatefulInterface {
+  id: number;
+  submittedAt: Date | null;
+  status: string;
+}
 
 // 1. Define the process
 const draft = new State("draft");
@@ -298,33 +312,34 @@ draft.getEvent("submit").attach(
 
 const articleProcess = new Process("article-workflow", draft);
 
-// 2. Set up the factory
-const factory = new Factory(
-  new SingleProcessDetector(articleProcess),
-  new StatefulStateNameDetector(),
+// 2. Set up the factory with typed generics
+const factory = new Factory<Article>(
+  new SingleProcessDetector<Article>(articleProcess),
+  new StatefulStateNameDetector(), // Reads article.status to set initial state
 );
 
-factory.setTransitionSelector(new ScoreTransition());
+factory.setTransitionSelector(new ScoreTransition<Article>());
 
 // 3. Register observers
 factory.attachStatemachineObserver(new StatefulStatusChanger());
 factory.attachStatemachineObserver(new OnEnterObserver());
 factory.attachStatemachineObserver(new TransitionLogger(logger));
 
-// 4. Optionally add locking
+// 4. Optionally add locking -- subject is typed, no cast needed
 factory.setMutexFactory(
-  new MutexFactory(
+  new MutexFactory<Article>(
     lockAdapter,
-    (subject) => `article:${(subject as Article).id}`,
+    (article) => `article:${article.id}`,
   ),
 );
 
-// 5. Use the factory
+// 5. Use the factory -- returns StatemachineInterface<Article>
 async function getStatemachine(article: Article) {
   return factory.createStatemachine(article);
 }
 
 // Create or restore state machines for any article
 const sm = await getStatemachine(articleFromDatabase);
+const subject = sm.getSubject(); // typed as Article
 await sm.triggerEvent("approve");
 ```

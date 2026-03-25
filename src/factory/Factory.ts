@@ -7,26 +7,31 @@ import type { StatemachineInterface } from "../interfaces/StatemachineInterface.
 import type { Observer } from "../interfaces/Observer.js";
 import { Statemachine } from "../Statemachine.js";
 
-export class Factory implements FactoryInterface {
-  private readonly processDetector: ProcessDetectorInterface;
-  private readonly stateNameDetector: StateNameDetectorInterface | null;
+export class Factory<TSubject = unknown>
+  implements FactoryInterface<TSubject>
+{
+  private readonly processDetector: ProcessDetectorInterface<TSubject>;
+  private readonly stateNameDetector: StateNameDetectorInterface<TSubject> | null;
   private readonly statemachineObservers: Set<Observer> = new Set();
-  private transitionSelector: TransitionSelectorInterface | null = null;
-  private mutexFactory: MutexFactoryInterface | null = null;
+  private transitionSelector: TransitionSelectorInterface<TSubject> | null =
+    null;
+  private mutexFactory: MutexFactoryInterface<TSubject> | null = null;
 
   constructor(
-    processDetector: ProcessDetectorInterface,
-    stateNameDetector?: StateNameDetectorInterface | null,
+    processDetector: ProcessDetectorInterface<TSubject>,
+    stateNameDetector?: StateNameDetectorInterface<TSubject> | null,
   ) {
     this.processDetector = processDetector;
     this.stateNameDetector = stateNameDetector ?? null;
   }
 
-  setMutexFactory(factory: MutexFactoryInterface | null): void {
+  setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void {
     this.mutexFactory = factory;
   }
 
-  setTransitionSelector(selector: TransitionSelectorInterface): void {
+  setTransitionSelector(
+    selector: TransitionSelectorInterface<TSubject>,
+  ): void {
     this.transitionSelector = selector;
   }
 
@@ -42,7 +47,9 @@ export class Factory implements FactoryInterface {
     return this.statemachineObservers;
   }
 
-  async createStatemachine(subject: unknown): Promise<StatemachineInterface> {
+  async createStatemachine(
+    subject: TSubject,
+  ): Promise<StatemachineInterface<TSubject>> {
     const process = this.processDetector.detectProcess(subject);
 
     const stateName = this.stateNameDetector

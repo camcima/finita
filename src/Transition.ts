@@ -3,16 +3,18 @@ import type { StateInterface } from "./interfaces/StateInterface.js";
 import type { EventInterface } from "./interfaces/EventInterface.js";
 import type { ConditionInterface } from "./interfaces/ConditionInterface.js";
 
-export class Transition implements TransitionInterface {
+export class Transition<TSubject = unknown>
+  implements TransitionInterface<TSubject>
+{
   private readonly targetState: StateInterface;
   private readonly eventName: string | null;
-  private readonly condition: ConditionInterface | null;
+  private readonly condition: ConditionInterface<TSubject> | null;
   private weight: number = 1;
 
   constructor(
     targetState: StateInterface,
     eventName: string | null = null,
-    condition: ConditionInterface | null = null,
+    condition: ConditionInterface<TSubject> | null = null,
   ) {
     this.targetState = targetState;
     this.eventName = eventName;
@@ -34,12 +36,12 @@ export class Transition implements TransitionInterface {
     return null;
   }
 
-  getCondition(): ConditionInterface | null {
+  getCondition(): ConditionInterface<TSubject> | null {
     return this.condition;
   }
 
   async isActive(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
     event?: EventInterface,
   ): Promise<boolean> {

@@ -131,13 +131,13 @@ interface StateInterface extends Named, Metadata {
 ### TransitionInterface
 
 ```typescript
-interface TransitionInterface extends Weighted {
+interface TransitionInterface<TSubject = unknown> extends Weighted {
   getTargetState(): StateInterface;
   getEventName(): string | null;
   getConditionName(): string | null;
-  getCondition(): ConditionInterface | null;
+  getCondition(): ConditionInterface<TSubject> | null;
   isActive(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
     event?: EventInterface,
   ): Promise<boolean>;
@@ -171,13 +171,13 @@ Note: `ProcessInterface` extends both `Named` and `StateCollectionInterface`. A 
 ### StatemachineInterface
 
 ```typescript
-interface StatemachineInterface extends ObservableSubject {
+interface StatemachineInterface<TSubject = unknown> extends ObservableSubject {
   getCurrentState(): StateInterface;
-  getSubject(): unknown;
+  getSubject(): TSubject;
   getProcess(): ProcessInterface;
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void>;
   checkTransitions(context?: Map<string, unknown>): Promise<void>;
-  getSelectedTransition(): TransitionInterface | null;
+  getSelectedTransition(): TransitionInterface<TSubject> | null;
   getLastState(): StateInterface | null;
   getCurrentContext(): Map<string, unknown> | null;
   acquireLock(): Promise<boolean>;
@@ -218,9 +218,9 @@ interface ObservableSubject {
 ### ConditionInterface
 
 ```typescript
-interface ConditionInterface extends Named {
+interface ConditionInterface<TSubject = unknown> extends Named {
   checkCondition(
-    subject: unknown,
+    subject: TSubject,
     context: Map<string, unknown>,
   ): MaybePromise<boolean>;
 }
@@ -233,10 +233,10 @@ interface ConditionInterface extends Named {
 ### FactoryInterface
 
 ```typescript
-interface FactoryInterface {
-  createStatemachine(subject: unknown): Promise<StatemachineInterface>;
-  setMutexFactory(factory: MutexFactoryInterface | null): void;
-  setTransitionSelector(selector: TransitionSelectorInterface): void;
+interface FactoryInterface<TSubject = unknown> {
+  createStatemachine(subject: TSubject): Promise<StatemachineInterface<TSubject>>;
+  setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
+  setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
   attachStatemachineObserver(observer: Observer): void;
   detachStatemachineObserver(observer: Observer): void;
   getStatemachineObservers(): Iterable<Observer>;
@@ -246,26 +246,26 @@ interface FactoryInterface {
 ### ProcessDetectorInterface
 
 ```typescript
-interface ProcessDetectorInterface {
-  detectProcess(subject: unknown): ProcessInterface;
+interface ProcessDetectorInterface<TSubject = unknown> {
+  detectProcess(subject: TSubject): ProcessInterface;
 }
 ```
 
 ### StateNameDetectorInterface
 
 ```typescript
-interface StateNameDetectorInterface {
-  detectCurrentStateName(subject: unknown): string | null;
+interface StateNameDetectorInterface<TSubject = unknown> {
+  detectCurrentStateName(subject: TSubject): string | null;
 }
 ```
 
 ### TransitionSelectorInterface
 
 ```typescript
-interface TransitionSelectorInterface {
+interface TransitionSelectorInterface<TSubject = unknown> {
   selectTransition(
-    transitions: Iterable<TransitionInterface>,
-  ): TransitionInterface | null;
+    transitions: Iterable<TransitionInterface<TSubject>>,
+  ): TransitionInterface<TSubject> | null;
 }
 ```
 
@@ -308,8 +308,8 @@ interface MutexInterface {
 ### MutexFactoryInterface
 
 ```typescript
-interface MutexFactoryInterface {
-  createMutex(subject: unknown): MaybePromise<MutexInterface>;
+interface MutexFactoryInterface<TSubject = unknown> {
+  createMutex(subject: TSubject): MaybePromise<MutexInterface>;
 }
 ```
 

@@ -1,10 +1,12 @@
 import type { ProcessDetectorInterface } from "../interfaces/ProcessDetectorInterface.js";
 import type { ProcessInterface } from "../interfaces/ProcessInterface.js";
 
-export abstract class AbstractNamedProcessDetector implements ProcessDetectorInterface {
+export abstract class AbstractNamedProcessDetector<TSubject = unknown>
+  implements ProcessDetectorInterface<TSubject>
+{
   private readonly processes: Map<string, ProcessInterface> = new Map();
 
-  protected abstract detectProcessName(subject: unknown): string;
+  protected abstract detectProcessName(subject: TSubject): string;
 
   addProcess(process: ProcessInterface): void {
     this.processes.set(process.getName(), process);
@@ -14,7 +16,7 @@ export abstract class AbstractNamedProcessDetector implements ProcessDetectorInt
     return this.processes.has(name);
   }
 
-  detectProcess(subject: unknown): ProcessInterface {
+  detectProcess(subject: TSubject): ProcessInterface {
     const name = this.detectProcessName(subject);
     const process = this.processes.get(name);
     if (!process) {

@@ -1,14 +1,16 @@
 import type { ProcessDetectorInterface } from "../interfaces/ProcessDetectorInterface.js";
 import type { ProcessInterface } from "../interfaces/ProcessInterface.js";
 
-export class SingleProcessDetector implements ProcessDetectorInterface {
+export class SingleProcessDetector<TSubject = unknown>
+  implements ProcessDetectorInterface<TSubject>
+{
   private readonly process: ProcessInterface;
 
   constructor(process: ProcessInterface) {
     this.process = process;
   }
 
-  detectProcess(_subject: unknown): ProcessInterface {
+  detectProcess(_subject: TSubject): ProcessInterface {
     return this.process;
   }
 }

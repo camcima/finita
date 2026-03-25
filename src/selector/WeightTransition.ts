@@ -2,19 +2,25 @@ import type { TransitionSelectorInterface } from "../interfaces/TransitionSelect
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import { OneOrNoneActiveTransition } from "./OneOrNoneActiveTransition.js";
 
-export class WeightTransition implements TransitionSelectorInterface {
-  private readonly innerSelector: TransitionSelectorInterface;
+export class WeightTransition<TSubject = unknown>
+  implements TransitionSelectorInterface<TSubject>
+{
+  private readonly innerSelector: TransitionSelectorInterface<TSubject>;
   private readonly epsilon: number;
 
-  constructor(innerSelector?: TransitionSelectorInterface, epsilon = 0.001) {
-    this.innerSelector = innerSelector ?? new OneOrNoneActiveTransition();
+  constructor(
+    innerSelector?: TransitionSelectorInterface<TSubject>,
+    epsilon = 0.001,
+  ) {
+    this.innerSelector =
+      innerSelector ?? new OneOrNoneActiveTransition<TSubject>();
     this.epsilon = epsilon;
   }
 
   selectTransition(
-    transitions: Iterable<TransitionInterface>,
-  ): TransitionInterface | null {
-    let bestTransitions: TransitionInterface[] = [];
+    transitions: Iterable<TransitionInterface<TSubject>>,
+  ): TransitionInterface<TSubject> | null {
+    let bestTransitions: TransitionInterface<TSubject>[] = [];
     let bestWeight: number | null = null;
     for (const transition of transitions) {
       const weight = transition.getWeight();
