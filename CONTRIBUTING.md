@@ -88,14 +88,54 @@ docs/                      # Component documentation
 - **Zero dependencies**: The library has no runtime dependencies. Keep it that way.
 - **Port fidelity**: This library is a TypeScript port of [metabor/statemachine](https://github.com/Metabor/Statemachine). Maintain structural alignment with the original PHP library where reasonable.
 
+## Git Hooks
+
+This project uses [Lefthook](https://github.com/evilmartians/lefthook) to run automated checks on commits. Hooks are installed automatically via the `prepare` script when you run `npm install`.
+
+**Pre-commit** hooks run in parallel:
+
+- **format** -- Prettier check on staged files
+- **lint** -- ESLint on staged `.ts` files
+- **typecheck** -- `tsc --noEmit`
+
+**Commit-msg** hook:
+
+- **commitlint** -- Validates commit messages against [Conventional Commits](https://www.conventionalcommits.org/)
+
+### Conventional Commits
+
+All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification, enforced by [commitlint](https://commitlint.js.org/) with the `@commitlint/config-conventional` preset.
+
+Format:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `perf`.
+
+Examples:
+
+```
+feat: add timeout option to state machine transitions
+fix: prevent duplicate observer notifications
+docs: update mutex usage examples
+chore: upgrade vitest to v3
+```
+
 ## Making Changes
 
 1. Create a feature branch from `main`
 2. Make your changes
 3. Ensure all tests pass (`npm test`), linting passes (`npm run lint`), and formatting is correct (`npm run format:check`)
 4. Add or update tests for any new or changed behavior
-5. Update documentation in `docs/` if your change affects the public API
-6. Open a pull request
+5. Write commit messages following the [Conventional Commits](#conventional-commits) format
+6. Update documentation in `docs/` if your change affects the public API
+7. Open a pull request
 
 ## Writing Tests
 
