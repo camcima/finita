@@ -95,23 +95,23 @@ new Transition<TSubject = unknown>(
 )
 ```
 
-| Parameter     | Type                                  | Default    | Description                                                                       |
-| ------------- | ------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
-| `targetState` | `StateInterface`                      | (required) | The state to transition to                                                        |
-| `eventName`   | `string \| null`                      | `null`     | The event that triggers this transition. `null` makes it an automatic transition. |
+| Parameter     | Type                                   | Default    | Description                                                                       |
+| ------------- | -------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
+| `targetState` | `StateInterface`                       | (required) | The state to transition to                                                        |
+| `eventName`   | `string \| null`                       | `null`     | The event that triggers this transition. `null` makes it an automatic transition. |
 | `condition`   | `ConditionInterface<TSubject> \| null` | `null`     | A guard condition that must be `true` for the transition to be active             |
 
 ### Methods
 
-| Method                               | Return Type                  | Description                                                 |
-| ------------------------------------ | ---------------------------- | ----------------------------------------------------------- |
-| `getTargetState()`                   | `StateInterface`             | Returns the target state                                    |
-| `getEventName()`                     | `string \| null`             | Returns the event name, or `null` for automatic transitions |
-| `getConditionName()`                 | `string \| null`             | Returns the condition name, or `null` if no condition       |
+| Method                               | Return Type                            | Description                                                 |
+| ------------------------------------ | -------------------------------------- | ----------------------------------------------------------- |
+| `getTargetState()`                   | `StateInterface`                       | Returns the target state                                    |
+| `getEventName()`                     | `string \| null`                       | Returns the event name, or `null` for automatic transitions |
+| `getConditionName()`                 | `string \| null`                       | Returns the condition name, or `null` if no condition       |
 | `getCondition()`                     | `ConditionInterface<TSubject> \| null` | Returns the condition object                                |
-| `isActive(subject, context, event?)` | `Promise<boolean>`           | Determines if this transition is currently active           |
-| `getWeight()`                        | `number`                     | Returns the weight (default: `1`)                           |
-| `setWeight(weight)`                  | `void`                       | Sets the weight                                             |
+| `isActive(subject, context, event?)` | `Promise<boolean>`                     | Determines if this transition is currently active           |
+| `getWeight()`                        | `number`                               | Returns the weight (default: `1`)                           |
+| `setWeight(weight)`                  | `void`                                 | Sets the weight                                             |
 
 ### How `isActive()` Works
 
@@ -310,36 +310,36 @@ new Statemachine<TSubject = unknown>(
 )
 ```
 
-| Parameter            | Type                                           | Default    | Description                                                                               |
-| -------------------- | ---------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `subject`            | `TSubject`                                     | (required) | The domain object being managed (e.g., an Order, Article, etc.)                           |
-| `process`            | `ProcessInterface`                             | (required) | The process defining the workflow                                                         |
-| `stateName`          | `string \| null`                               | `null`     | Optional initial state name. If `null`, uses `process.getInitialState()`.                 |
+| Parameter            | Type                                            | Default    | Description                                                                               |
+| -------------------- | ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `subject`            | `TSubject`                                      | (required) | The domain object being managed (e.g., an Order, Article, etc.)                           |
+| `process`            | `ProcessInterface`                              | (required) | The process defining the workflow                                                         |
+| `stateName`          | `string \| null`                                | `null`     | Optional initial state name. If `null`, uses `process.getInitialState()`.                 |
 | `transitionSelector` | `TransitionSelectorInterface<TSubject> \| null` | `null`     | Strategy for selecting among active transitions. Defaults to `OneOrNoneActiveTransition`. |
-| `mutex`              | `MutexInterface \| null`                       | `null`     | Mutex for concurrency control. Defaults to `NullMutex`.                                   |
+| `mutex`              | `MutexInterface \| null`                        | `null`     | Mutex for concurrency control. Defaults to `NullMutex`.                                   |
 
 ### Methods
 
-| Method                                      | Return Type                    | Description                                                              |
-| ------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------ |
-| `getCurrentState()`                         | `StateInterface`               | Returns the current state                                                |
-| `getLastState()`                            | `StateInterface \| null`       | Returns the previous state (only available during observer notification) |
-| `getSubject()`                              | `TSubject`                     | Returns the managed subject                                              |
-| `getProcess()`                              | `ProcessInterface`             | Returns the process                                                      |
-| `getSelectedTransition()`                   | `TransitionInterface<TSubject> \| null`  | Returns the transition being executed (only during notification)         |
-| `getCurrentContext()`                       | `Map<string, unknown> \| null` | Returns the current context (only during event processing)               |
-| `triggerEvent(name, context?)`              | `Promise<void>`                | Triggers a named event on the current state                              |
-| `checkTransitions(context?)`                | `Promise<void>`                | Evaluates automatic transitions                                          |
-| `dispatchEvent(dispatcher, name, context?)` | `Promise<void>`                | Advanced: dispatches an event through a custom dispatcher                |
-| `acquireLock()`                             | `Promise<boolean>`             | Manually acquires the lock                                               |
-| `releaseLock()`                             | `Promise<void>`                | Manually releases the lock                                               |
-| `isLockAcquired()`                          | `boolean`                      | Checks if the lock is currently acquired                                 |
-| `isAutoreleaseLock()`                       | `boolean`                      | Checks if auto-release is enabled                                        |
-| `setAutoreleaseLock(autorelease)`           | `void`                         | Enables/disables auto-release of the lock after event processing         |
-| `attach(observer)`                          | `void`                         | Attaches a state machine observer                                        |
-| `detach(observer)`                          | `void`                         | Detaches a state machine observer                                        |
-| `notify()`                                  | `Promise<void>`                | Notifies all attached observers                                          |
-| `getObservers()`                            | `Iterable<Observer>`           | Returns all attached observers                                           |
+| Method                                      | Return Type                             | Description                                                              |
+| ------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------ |
+| `getCurrentState()`                         | `StateInterface`                        | Returns the current state                                                |
+| `getLastState()`                            | `StateInterface \| null`                | Returns the previous state (only available during observer notification) |
+| `getSubject()`                              | `TSubject`                              | Returns the managed subject                                              |
+| `getProcess()`                              | `ProcessInterface`                      | Returns the process                                                      |
+| `getSelectedTransition()`                   | `TransitionInterface<TSubject> \| null` | Returns the transition being executed (only during notification)         |
+| `getCurrentContext()`                       | `Map<string, unknown> \| null`          | Returns the current context (only during event processing)               |
+| `triggerEvent(name, context?)`              | `Promise<void>`                         | Triggers a named event on the current state                              |
+| `checkTransitions(context?)`                | `Promise<void>`                         | Evaluates automatic transitions                                          |
+| `dispatchEvent(dispatcher, name, context?)` | `Promise<void>`                         | Advanced: dispatches an event through a custom dispatcher                |
+| `acquireLock()`                             | `Promise<boolean>`                      | Manually acquires the lock                                               |
+| `releaseLock()`                             | `Promise<void>`                         | Manually releases the lock                                               |
+| `isLockAcquired()`                          | `boolean`                               | Checks if the lock is currently acquired                                 |
+| `isAutoreleaseLock()`                       | `boolean`                               | Checks if auto-release is enabled                                        |
+| `setAutoreleaseLock(autorelease)`           | `void`                                  | Enables/disables auto-release of the lock after event processing         |
+| `attach(observer)`                          | `void`                                  | Attaches a state machine observer                                        |
+| `detach(observer)`                          | `void`                                  | Detaches a state machine observer                                        |
+| `notify()`                                  | `Promise<void>`                         | Notifies all attached observers                                          |
+| `getObservers()`                            | `Iterable<Observer>`                    | Returns all attached observers                                           |
 
 ### Event Processing Flow
 

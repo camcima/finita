@@ -53,21 +53,21 @@ new Factory<TSubject = unknown>(
 )
 ```
 
-| Parameter           | Type                                          | Default    | Description                                                               |
-| ------------------- | --------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
-| `processDetector`   | `ProcessDetectorInterface<TSubject>`          | (required) | Determines which process to use for the subject                           |
+| Parameter           | Type                                           | Default    | Description                                                               |
+| ------------------- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `processDetector`   | `ProcessDetectorInterface<TSubject>`           | (required) | Determines which process to use for the subject                           |
 | `stateNameDetector` | `StateNameDetectorInterface<TSubject> \| null` | `null`     | Detects the current state from the subject (for restoring state machines) |
 
 ### Methods
 
-| Method                                 | Return Type                      | Description                                                    |
-| -------------------------------------- | -------------------------------- | -------------------------------------------------------------- |
+| Method                                 | Return Type                                | Description                                                    |
+| -------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- |
 | `createStatemachine(subject)`          | `Promise<StatemachineInterface<TSubject>>` | Creates a fully configured state machine for the subject       |
-| `setMutexFactory(factory)`             | `void`                           | Sets the mutex factory for concurrency control                 |
-| `setTransitionSelector(selector)`      | `void`                           | Sets the transition selector strategy                          |
-| `attachStatemachineObserver(observer)` | `void`                           | Registers an observer to attach to every created state machine |
-| `detachStatemachineObserver(observer)` | `void`                           | Unregisters an observer                                        |
-| `getStatemachineObservers()`           | `Iterable<Observer>`             | Returns all registered observers                               |
+| `setMutexFactory(factory)`             | `void`                                     | Sets the mutex factory for concurrency control                 |
+| `setTransitionSelector(selector)`      | `void`                                     | Sets the transition selector strategy                          |
+| `attachStatemachineObserver(observer)` | `void`                                     | Registers an observer to attach to every created state machine |
+| `detachStatemachineObserver(observer)` | `void`                                     | Unregisters an observer                                        |
+| `getStatemachineObservers()`           | `Iterable<Observer>`                       | Returns all registered observers                               |
 
 ### Example
 
@@ -327,10 +327,7 @@ factory.attachStatemachineObserver(new TransitionLogger(logger));
 
 // 4. Optionally add locking -- subject is typed, no cast needed
 factory.setMutexFactory(
-  new MutexFactory<Article>(
-    lockAdapter,
-    (article) => `article:${article.id}`,
-  ),
+  new MutexFactory<Article>(lockAdapter, (article) => `article:${article.id}`),
 );
 
 // 5. Use the factory -- returns StatemachineInterface<Article>

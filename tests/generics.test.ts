@@ -166,8 +166,7 @@ describe("Generics - typed subject", () => {
       releaseLock: vi.fn().mockResolvedValue(undefined),
       isLocked: vi.fn().mockReturnValue(false),
     };
-    const converter: StringConverter<Order> = (order) =>
-      `order-${order.id}`;
+    const converter: StringConverter<Order> = (order) => `order-${order.id}`;
     const factory = new MutexFactory<Order>(lockAdapter, converter);
     const mutex = factory.createMutex({ id: 42, status: "pending", total: 0 });
     expect(mutex).toBeDefined();

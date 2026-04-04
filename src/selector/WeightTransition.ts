@@ -2,9 +2,9 @@ import type { TransitionSelectorInterface } from "../interfaces/TransitionSelect
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import { OneOrNoneActiveTransition } from "./OneOrNoneActiveTransition.js";
 
-export class WeightTransition<TSubject = unknown>
-  implements TransitionSelectorInterface<TSubject>
-{
+export class WeightTransition<
+  TSubject = unknown,
+> implements TransitionSelectorInterface<TSubject> {
   private readonly innerSelector: TransitionSelectorInterface<TSubject>;
   private readonly epsilon: number;
 

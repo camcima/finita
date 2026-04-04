@@ -1,8 +1,6 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 
-export class Not<TSubject = unknown>
-  implements ConditionInterface<TSubject>
-{
+export class Not<TSubject = unknown> implements ConditionInterface<TSubject> {
   private readonly condition: ConditionInterface<TSubject>;
 
   constructor(condition: ConditionInterface<TSubject>) {

@@ -7,9 +7,7 @@ import type { StatemachineInterface } from "../interfaces/StatemachineInterface.
 import type { Observer } from "../interfaces/Observer.js";
 import { Statemachine } from "../Statemachine.js";
 
-export class Factory<TSubject = unknown>
-  implements FactoryInterface<TSubject>
-{
+export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
   private readonly processDetector: ProcessDetectorInterface<TSubject>;
   private readonly stateNameDetector: StateNameDetectorInterface<TSubject> | null;
   private readonly statemachineObservers: Set<Observer> = new Set();
@@ -29,9 +27,7 @@ export class Factory<TSubject = unknown>
     this.mutexFactory = factory;
   }
 
-  setTransitionSelector(
-    selector: TransitionSelectorInterface<TSubject>,
-  ): void {
+  setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void {
     this.transitionSelector = selector;
   }
 

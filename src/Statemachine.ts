@@ -15,9 +15,9 @@ import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 
-export class Statemachine<TSubject = unknown>
-  implements StatemachineInterface<TSubject>
-{
+export class Statemachine<
+  TSubject = unknown,
+> implements StatemachineInterface<TSubject> {
   private readonly subject: TSubject;
   private currentState: StateInterface;
   private lastState: StateInterface | null = null;

@@ -145,9 +145,9 @@ Wraps a function as a condition. This is the most common way to create custom gu
 new CallbackCondition<TSubject = unknown>(name: string, callable: ConditionCallbackFn<TSubject>)
 ```
 
-| Parameter  | Type                                                                           | Description                                                              |
-| ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `name`     | `string`                                                                       | The condition name (used as identity for deduplication and graph labels) |
+| Parameter  | Type                                                                          | Description                                                              |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `name`     | `string`                                                                      | The condition name (used as identity for deduplication and graph labels) |
 | `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                                       |
 
 ### Example

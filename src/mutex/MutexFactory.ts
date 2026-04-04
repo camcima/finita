@@ -3,13 +3,11 @@ import type { MutexInterface } from "../interfaces/MutexInterface.js";
 import type { LockAdapterInterface } from "../interfaces/LockAdapterInterface.js";
 import { LockAdapterMutex } from "./LockAdapterMutex.js";
 
-export type StringConverter<TSubject = unknown> = (
-  subject: TSubject,
-) => string;
+export type StringConverter<TSubject = unknown> = (subject: TSubject) => string;
 
-export class MutexFactory<TSubject = unknown>
-  implements MutexFactoryInterface<TSubject>
-{
+export class MutexFactory<
+  TSubject = unknown,
+> implements MutexFactoryInterface<TSubject> {
   private readonly lockAdapter: LockAdapterInterface;
   private readonly stringConverter: StringConverter<TSubject>;
 

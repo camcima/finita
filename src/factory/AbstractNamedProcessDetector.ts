@@ -1,9 +1,9 @@
 import type { ProcessDetectorInterface } from "../interfaces/ProcessDetectorInterface.js";
 import type { ProcessInterface } from "../interfaces/ProcessInterface.js";
 
-export abstract class AbstractNamedProcessDetector<TSubject = unknown>
-  implements ProcessDetectorInterface<TSubject>
-{
+export abstract class AbstractNamedProcessDetector<
+  TSubject = unknown,
+> implements ProcessDetectorInterface<TSubject> {
   private readonly processes: Map<string, ProcessInterface> = new Map();
 
   protected abstract detectProcessName(subject: TSubject): string;

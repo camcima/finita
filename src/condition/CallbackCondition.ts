@@ -6,9 +6,9 @@ export type ConditionCallbackFn<TSubject = unknown> = (
   context: Map<string, unknown>,
 ) => MaybePromise<boolean>;
 
-export class CallbackCondition<TSubject = unknown>
-  implements ConditionInterface<TSubject>
-{
+export class CallbackCondition<
+  TSubject = unknown,
+> implements ConditionInterface<TSubject> {
   private readonly name: string;
   private readonly callable: ConditionCallbackFn<TSubject>;
 

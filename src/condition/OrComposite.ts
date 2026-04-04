@@ -1,8 +1,8 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 
-export class OrComposite<TSubject = unknown>
-  implements ConditionInterface<TSubject>
-{
+export class OrComposite<
+  TSubject = unknown,
+> implements ConditionInterface<TSubject> {
   private readonly conditions: ConditionInterface<TSubject>[] = [];
 
   constructor(condition: ConditionInterface<TSubject>) {

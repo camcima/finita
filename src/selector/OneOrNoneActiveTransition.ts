@@ -1,9 +1,9 @@
 import type { TransitionSelectorInterface } from "../interfaces/TransitionSelectorInterface.js";
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 
-export class OneOrNoneActiveTransition<TSubject = unknown>
-  implements TransitionSelectorInterface<TSubject>
-{
+export class OneOrNoneActiveTransition<
+  TSubject = unknown,
+> implements TransitionSelectorInterface<TSubject> {
   selectTransition(
     transitions: Iterable<TransitionInterface<TSubject>>,
   ): TransitionInterface<TSubject> | null {

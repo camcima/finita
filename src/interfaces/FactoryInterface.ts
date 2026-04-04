@@ -8,9 +8,7 @@ export interface FactoryInterface<TSubject = unknown> {
     subject: TSubject,
   ): Promise<StatemachineInterface<TSubject>>;
   setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
-  setTransitionSelector(
-    selector: TransitionSelectorInterface<TSubject>,
-  ): void;
+  setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
   attachStatemachineObserver(observer: Observer): void;
   detachStatemachineObserver(observer: Observer): void;
   getStatemachineObservers(): Iterable<Observer>;

@@ -234,7 +234,9 @@ interface ConditionInterface<TSubject = unknown> extends Named {
 
 ```typescript
 interface FactoryInterface<TSubject = unknown> {
-  createStatemachine(subject: TSubject): Promise<StatemachineInterface<TSubject>>;
+  createStatemachine(
+    subject: TSubject,
+  ): Promise<StatemachineInterface<TSubject>>;
   setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
   setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
   attachStatemachineObserver(observer: Observer): void;

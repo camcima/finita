@@ -2,9 +2,9 @@ import type { TransitionSelectorInterface } from "../interfaces/TransitionSelect
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import { OneOrNoneActiveTransition } from "./OneOrNoneActiveTransition.js";
 
-export class ScoreTransition<TSubject = unknown>
-  implements TransitionSelectorInterface<TSubject>
-{
+export class ScoreTransition<
+  TSubject = unknown,
+> implements TransitionSelectorInterface<TSubject> {
   private readonly innerSelector: TransitionSelectorInterface<TSubject>;
 
   constructor(innerSelector?: TransitionSelectorInterface<TSubject>) {
@@ -12,9 +12,7 @@ export class ScoreTransition<TSubject = unknown>
       innerSelector ?? new OneOrNoneActiveTransition<TSubject>();
   }
 
-  protected calculateScore(
-    transition: TransitionInterface<TSubject>,
-  ): number {
+  protected calculateScore(transition: TransitionInterface<TSubject>): number {
     let score = 0;
     if (transition.getEventName()) {
       score += 2;

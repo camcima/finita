@@ -3,8 +3,9 @@ import type { StateInterface } from "./StateInterface.js";
 import type { ProcessInterface } from "./ProcessInterface.js";
 import type { TransitionInterface } from "./TransitionInterface.js";
 
-export interface StatemachineInterface<TSubject = unknown>
-  extends ObservableSubject {
+export interface StatemachineInterface<
+  TSubject = unknown,
+> extends ObservableSubject {
   getCurrentState(): StateInterface;
   getSubject(): TSubject;
   getProcess(): ProcessInterface;

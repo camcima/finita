@@ -10,9 +10,7 @@ function isStateful(obj: unknown): obj is StatefulInterface {
   );
 }
 
-export class StatefulStateNameDetector
-  implements StateNameDetectorInterface<StatefulInterface>
-{
+export class StatefulStateNameDetector implements StateNameDetectorInterface<StatefulInterface> {
   detectCurrentStateName(subject: StatefulInterface): string | null {
     if (isStateful(subject)) {
       return subject.getCurrentStateName();

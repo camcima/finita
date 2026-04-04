@@ -3,9 +3,9 @@ import type { StateInterface } from "./interfaces/StateInterface.js";
 import type { EventInterface } from "./interfaces/EventInterface.js";
 import type { ConditionInterface } from "./interfaces/ConditionInterface.js";
 
-export class Transition<TSubject = unknown>
-  implements TransitionInterface<TSubject>
-{
+export class Transition<
+  TSubject = unknown,
+> implements TransitionInterface<TSubject> {
   private readonly targetState: StateInterface;
   private readonly eventName: string | null;
   private readonly condition: ConditionInterface<TSubject> | null;
