@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: "*.{ts,js,json,md,yml,yaml}"
+      run: npx prettier --check {staged_files}
+
+    - name: lint
+      glob: "*.ts"
+      run: npx eslint {staged_files}
+
+    - name: typecheck
+      run: npx tsc --noEmit
