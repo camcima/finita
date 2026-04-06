@@ -188,6 +188,27 @@ src/
   error/                   # Custom error classes
 ```
 
+## Security
+
+### CI
+
+- **CodeQL** -- static analysis for security vulnerabilities (push, PR, weekly)
+- **OSV-Scanner** -- dependency vulnerability scanning against the [OSV database](https://osv.dev/) (push, PR, weekly)
+- **Dependabot** -- automated PRs for dependency and GitHub Actions updates (weekly)
+
+### Local (via Lefthook)
+
+- **Gitleaks** -- scans staged files for secrets on every commit (auto-skipped if not installed)
+
+### Manual checks
+
+```bash
+npm run security:audit    # npm dependency audit
+npm run security:secrets  # Scan full repo for secrets (requires gitleaks)
+```
+
+Install Gitleaks: <https://github.com/gitleaks/gitleaks#installing>
+
 ## Development
 
 ```bash

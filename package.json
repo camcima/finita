@@ -29,6 +29,8 @@
     "lint": "tsc --noEmit && tsc --project tsconfig.test.json && eslint src/ tests/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "security:audit": "npm audit",
+    "security:secrets": "gitleaks detect --no-banner",
     "release": "release-it",
     "prepare": "lefthook install"
   },

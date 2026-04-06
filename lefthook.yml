@@ -12,6 +12,14 @@ pre-commit:
     - name: typecheck
       run: npx tsc --noEmit
 
+    - name: secrets
+      run: |
+        if ! command -v gitleaks >/dev/null 2>&1; then
+          echo "gitleaks not installed, skipping secret scan"
+          exit 0
+        fi
+        gitleaks protect --staged --no-banner
+
 commit-msg:
   jobs:
     - name: commitlint
