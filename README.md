@@ -6,7 +6,7 @@
 
 <br>
 
-[![CI](https://github.com/camcima/finita/actions/workflows/ci.yml/badge.svg)](https://github.com/camcima/finita/actions/workflows/ci.yml)
+[![CI](https://github.com/camcima/finita/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/camcima/finita/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/badge/CodeQL-enabled-brightgreen)](https://github.com/camcima/finita/security/code-scanning)
 [![codecov](https://codecov.io/gh/camcima/finita/graph/badge.svg)](https://codecov.io/gh/camcima/finita)
 [![npm version](https://img.shields.io/npm/v/@camcima/finita)](https://www.npmjs.com/package/@camcima/finita)
