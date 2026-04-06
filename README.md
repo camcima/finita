@@ -39,7 +39,7 @@ This library is a TypeScript port of [metabor/statemachine](https://github.com/M
 ## Installation
 
 ```bash
-npm install @camcima/finita
+pnpm add @camcima/finita
 ```
 
 ## Quick Start
@@ -204,8 +204,8 @@ src/
 ### Manual checks
 
 ```bash
-npm run security:audit    # npm dependency audit
-npm run security:secrets  # Scan full repo for secrets (requires gitleaks)
+pnpm run security:audit    # dependency audit
+pnpm run security:secrets  # Scan full repo for secrets (requires gitleaks)
 ```
 
 Install Gitleaks: <https://github.com/gitleaks/gitleaks#installing>
@@ -214,19 +214,19 @@ Install Gitleaks: <https://github.com/gitleaks/gitleaks#installing>
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run tests
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Type check
-npm run lint
+pnpm run lint
 
 # Build
-npm run build
+pnpm run build
 ```
 
 ## License

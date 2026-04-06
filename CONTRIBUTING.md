@@ -5,14 +5,14 @@ Thanks for your interest in contributing! This document covers the basics for ge
 ## Prerequisites
 
 - Node.js 18+
-- npm
+- pnpm
 
 ## Setup
 
 ```bash
 git clone https://github.com/camcima/finita.git
 cd finita
-npm install
+pnpm install
 ```
 
 ## Development Workflow
@@ -21,10 +21,10 @@ npm install
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### Linting
@@ -32,7 +32,7 @@ npm run test:watch
 Runs TypeScript type checking and ESLint:
 
 ```bash
-npm run lint
+pnpm run lint
 ```
 
 ### Formatting
@@ -40,19 +40,19 @@ npm run lint
 The project uses [Prettier](https://prettier.io/) with default settings. To format all files:
 
 ```bash
-npm run format
+pnpm run format
 ```
 
 To check formatting without writing changes:
 
 ```bash
-npm run format:check
+pnpm run format:check
 ```
 
 ### Building
 
 ```bash
-npm run build
+ppnpm run build
 ```
 
 ## Project Structure
@@ -90,7 +90,7 @@ docs/                      # Component documentation
 
 ## Git Hooks
 
-This project uses [Lefthook](https://github.com/evilmartians/lefthook) to run automated checks on commits. Hooks are installed automatically via the `prepare` script when you run `npm install`.
+This project uses [Lefthook](https://github.com/evilmartians/lefthook) to run automated checks on commits. Hooks are installed automatically via the `prepare` script when you run `pnpm install`.
 
 **Pre-commit** hooks run in parallel:
 
@@ -131,7 +131,7 @@ chore: upgrade vitest to v3
 
 1. Create a feature branch from `main`
 2. Make your changes
-3. Ensure all tests pass (`npm test`), linting passes (`npm run lint`), and formatting is correct (`npm run format:check`)
+3. Ensure all tests pass (`pnpm test`), linting passes (`pnpm run lint`), and formatting is correct (`pnpm run format:check`)
 4. Add or update tests for any new or changed behavior
 5. Write commit messages following the [Conventional Commits](#conventional-commits) format
 6. Update documentation in `docs/` if your change affects the public API

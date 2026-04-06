@@ -29,7 +29,7 @@
     "lint": "tsc --noEmit && tsc --project tsconfig.test.json && eslint src/ tests/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "security:audit": "npm audit",
+    "security:audit": "pnpm audit",
     "security:secrets": "gitleaks detect --no-banner",
     "release": "release-it",
     "prepare": "lefthook install"
@@ -54,6 +54,7 @@
     "url": "https://github.com/camcima/finita/issues"
   },
   "license": "MIT",
+  "packageManager": "pnpm@10.17.0",
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
