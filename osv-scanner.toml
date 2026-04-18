@@ -1,5 +1,8 @@
-# Ignore dev dependency vulnerabilities — this library ships zero runtime deps.
-# Dev deps only affect the local development workflow, not consumers.
+# OSV-Scanner ignores dev-only transitive dependencies.
+# finita ships zero runtime deps — everything in the lockfile is dev-only.
+
 [[PackageOverrides]]
-group = "dev"
+name = "basic-ftp"
+ecosystem = "npm"
 ignore = true
+reason = "Dev-only transitive dep (release-it > proxy-agent > pac-proxy-agent > get-uri)"

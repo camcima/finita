@@ -54,7 +54,7 @@
     "url": "https://github.com/camcima/finita/issues"
   },
   "license": "MIT",
-  "packageManager": "pnpm@10.17.0",
+  "packageManager": "pnpm@9.15.0",
   "pnpm": {
     "overrides": {
       "undici": ">=6.24.0"
