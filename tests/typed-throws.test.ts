@@ -4,6 +4,7 @@ import {
   StateNotFoundError,
   StateEventNotFoundError,
   ProcessNotFoundError,
+  InvalidSubjectError,
 } from "../src/error/index.js";
 import { ProcessBuilder } from "../src/ProcessBuilder.js";
 
@@ -89,6 +90,27 @@ describe("typed throws", () => {
       expect(e.code).toBe("processNotFound");
       expect(e.processName).toBe("missing");
       expect([...e.availableProcesses]).toEqual(["known"]);
+    });
+  });
+
+  describe("StatefulStateNameDetector.detectCurrentStateName", () => {
+    it("throws InvalidSubjectError listing the missing member", async () => {
+      const { StatefulStateNameDetector } =
+        await import("../src/factory/StatefulStateNameDetector.js");
+      const detector = new StatefulStateNameDetector();
+      let caught: unknown;
+      try {
+        detector.detectCurrentStateName({} as never);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(InvalidSubjectError);
+      const e = caught as InvalidSubjectError;
+      expect(e.code).toBe("invalidSubject");
+      expect(e.expectedInterface).toBe("StatefulInterface");
+      expect(e.missingMembers).toEqual(["getCurrentStateName"]);
+      // factory.test.ts asserts the message contains "StatefulInterface"
+      expect(e.message).toContain("StatefulInterface");
     });
   });
 });
