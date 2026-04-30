@@ -32,7 +32,7 @@
     "security:audit": "pnpm audit",
     "security:secrets": "gitleaks detect --no-banner",
     "release": "release-it",
-    "prepublishOnly": "pnpm run build && pnpm run lint && pnpm test",
+    "prepublishOnly": "pnpm run build && pnpm run lint && pnpm test && npm pack --dry-run",
     "prepare": "lefthook install"
   },
   "keywords": [
