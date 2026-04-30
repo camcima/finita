@@ -11,8 +11,8 @@
 [![codecov](https://codecov.io/gh/camcima/finita/graph/badge.svg)](https://codecov.io/gh/camcima/finita)
 [![npm version](https://img.shields.io/npm/v/@camcima/finita)](https://www.npmjs.com/package/@camcima/finita)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%20%7C%2020%20%7C%2022-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%20%7C%2022%20%7C%2024-green.svg)](https://nodejs.org/)
 
 </div>
 
