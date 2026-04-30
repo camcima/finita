@@ -224,28 +224,38 @@ class RedisLockAdapter implements LockAdapterInterface {
 
 ### Database Lock Adapter
 
-An async adapter using `Promise<boolean>`. Synchronous adapters that return `boolean` directly also work since `MaybePromise<boolean>` accepts both:
+An async adapter using `Promise<boolean>`. Synchronous adapters that return `boolean` directly also work since `MaybePromise<boolean>` accepts both. The example uses `pg_try_advisory_lock` (non-blocking, boolean-returning) so it matches the `acquireLock` contract, and parameterizes the lock name via the database driver — never interpolate a name into a SQL string:
 
 ```typescript
 class DatabaseLockAdapter implements LockAdapterInterface {
   constructor(private db: Database) {}
 
   async acquireLock(name: string): Promise<boolean> {
-    try {
-      await this.db.exec(`SELECT pg_advisory_lock(hashtext('${name}'))`);
-      return true;
-    } catch {
-      return false;
-    }
+    // pg_try_advisory_lock returns boolean: true if the lock was acquired
+    // immediately, false if held by another session. Non-blocking — fits
+    // the boolean acquireLock contract.
+    const { rows } = await this.db.query(
+      "SELECT pg_try_advisory_lock(hashtext($1)) AS locked",
+      [name],
+    );
+    return rows[0].locked === true;
   }
 
   async releaseLock(name: string): Promise<boolean> {
-    await this.db.exec(`SELECT pg_advisory_unlock(hashtext('${name}'))`);
-    return true;
+    const { rows } = await this.db.query(
+      "SELECT pg_advisory_unlock(hashtext($1)) AS released",
+      [name],
+    );
+    return rows[0].released === true;
   }
 
   async isLocked(name: string): Promise<boolean> {
-    // Check pg_locks or similar
+    // Advisory-lock visibility depends on your pg_locks query strategy
+    // and concurrency model; pg_locks columns for advisory keys vary
+    // by single- vs two-argument lock form. Stubbed here — implement
+    // as your operations team requires (e.g. via a session bookkeeping
+    // table).
+    void name;
     return false;
   }
 }
