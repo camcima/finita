@@ -148,17 +148,17 @@ classDiagram
 
 Detailed documentation for every component:
 
-- **[Core](docs/core.md)** -- State, Transition, Event, Process, Statemachine, Dispatcher, StateCollection
-- **[Conditions](docs/conditions.md)** -- Tautology, Contradiction, CallbackCondition, Timeout, AndComposite, OrComposite, Not
-- **[Observers](docs/observers.md)** -- CallbackObserver, StatefulStatusChanger, OnEnterObserver, TransitionLogger
-- **[Filters](docs/filters.md)** -- ActiveTransitionFilter, FilterStateByEvent, FilterStateByTransition, FilterStateByFinalState, FilterTransitionByEvent
-- **[Selectors](docs/selectors.md)** -- OneOrNoneActiveTransition, ScoreTransition, WeightTransition
-- **[Mutex](docs/mutex.md)** -- NullMutex, LockAdapterMutex, MutexFactory
-- **[Factory](docs/factory.md)** -- Factory, SingleProcessDetector, AbstractNamedProcessDetector, StatefulStateNameDetector
-- **[Graph](docs/graph.md)** -- GraphBuilder
-- **[Errors](docs/errors.md)** -- WrongEventForStateError, LockCanNotBeAcquiredError, DuplicateStateError, ProcessFinalizedError, GraphValidationError, DuplicateTransitionError
-- **[Interfaces](docs/interfaces.md)** -- All TypeScript interfaces
-- **[Migration Guide](docs/migration/v2-to-v3.md)** -- Upgrading from v2 to v3
+- **[Core](https://github.com/camcima/finita/blob/main/docs/core.md)** -- State, Transition, Event, Process, Statemachine, Dispatcher, StateCollection
+- **[Conditions](https://github.com/camcima/finita/blob/main/docs/conditions.md)** -- Tautology, Contradiction, CallbackCondition, Timeout, AndComposite, OrComposite, Not
+- **[Observers](https://github.com/camcima/finita/blob/main/docs/observers.md)** -- CallbackObserver, StatefulStatusChanger, OnEnterObserver, TransitionLogger
+- **[Filters](https://github.com/camcima/finita/blob/main/docs/filters.md)** -- ActiveTransitionFilter, FilterStateByEvent, FilterStateByTransition, FilterStateByFinalState, FilterTransitionByEvent
+- **[Selectors](https://github.com/camcima/finita/blob/main/docs/selectors.md)** -- OneOrNoneActiveTransition, ScoreTransition, WeightTransition
+- **[Mutex](https://github.com/camcima/finita/blob/main/docs/mutex.md)** -- NullMutex, LockAdapterMutex, MutexFactory
+- **[Factory](https://github.com/camcima/finita/blob/main/docs/factory.md)** -- Factory, SingleProcessDetector, AbstractNamedProcessDetector, StatefulStateNameDetector
+- **[Graph](https://github.com/camcima/finita/blob/main/docs/graph.md)** -- GraphBuilder
+- **[Errors](https://github.com/camcima/finita/blob/main/docs/errors.md)** -- WrongEventForStateError, LockCanNotBeAcquiredError, DuplicateStateError, ProcessFinalizedError, GraphValidationError, DuplicateTransitionError
+- **[Interfaces](https://github.com/camcima/finita/blob/main/docs/interfaces.md)** -- All TypeScript interfaces
+- **[Migration Guide](https://github.com/camcima/finita/blob/main/docs/migration/v2-to-v3.md)** -- Upgrading from v2 to v3
 
 ## Examples
 
