@@ -14,6 +14,10 @@ export type { MutexInterface } from "./MutexInterface.js";
 export type { MutexFactoryInterface } from "./MutexFactoryInterface.js";
 export type { LockAdapterInterface } from "./LockAdapterInterface.js";
 export type { TransitionSelectorInterface } from "./TransitionSelectorInterface.js";
+export type {
+  TransitionFrame,
+  ProposedTransitionFrame,
+} from "./TransitionFrameInterface.js";
 export type { ProcessDetectorInterface } from "./ProcessDetectorInterface.js";
 export type { StateNameDetectorInterface } from "./StateNameDetectorInterface.js";
 export type { FactoryInterface } from "./FactoryInterface.js";

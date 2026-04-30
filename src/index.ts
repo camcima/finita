@@ -28,6 +28,8 @@ export type {
   MutexFactoryInterface,
   LockAdapterInterface,
   TransitionSelectorInterface,
+  TransitionFrame,
+  ProposedTransitionFrame,
   ProcessDetectorInterface,
   StateNameDetectorInterface,
   FactoryInterface,
