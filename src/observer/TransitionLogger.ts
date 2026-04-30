@@ -17,9 +17,9 @@ function asString(obj: unknown): string {
   return String(obj);
 }
 
-export class TransitionLogger<TSubject = unknown>
-  implements AfterTransitionObserver<TSubject>
-{
+export class TransitionLogger<
+  TSubject = unknown,
+> implements AfterTransitionObserver<TSubject> {
   private readonly logger: LoggerInterface;
   private readonly loggerLevel: string;
 
@@ -31,10 +31,8 @@ export class TransitionLogger<TSubject = unknown>
   notify(frame: TransitionFrame<TSubject>): void {
     let message = "Transition";
 
-    if (frame.machineName != null) {
-      // Subject identity isn't on the frame in v3 — callers who want subject
-      // names attach a custom observer that closes over the subject.
-    }
+    // Subject identity isn't on the frame in v3 — callers who want subject
+    // names attach a custom observer that closes over the subject.
 
     message += ` from "${asString(frame.fromState)}" to "${asString(frame.toState)}"`;
 

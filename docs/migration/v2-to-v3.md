@@ -108,6 +108,20 @@ Migration rule of thumb:
 
 If your code asserted that a logger registered after `OnEnterObserver` saw the chained transition, those assertions need updating.
 
+### Awaiting the chain to drain
+
+Because the chained event runs as a **separate top-level operation**, it has not necessarily completed by the time `await sm.triggerEvent(...)` resolves. The original caller's promise resolves when its own operation finishes — chained operations are then drained on subsequent microtasks. If your code reads `currentState` immediately after `await`, you may observe the pre-chain state.
+
+To wait for the queue to fully drain, yield once:
+
+```ts
+await sm.triggerEvent("go");
+await new Promise((r) => setTimeout(r, 0)); // allow the OnEnter chain to drain
+expect(sm.getCurrentState().getName()).toBe("c"); // chained target
+```
+
+This pattern is what the regression test suite uses. A future release may add an explicit `sm.waitIdle()` API.
+
 ## 6. Concurrency — same-instance calls serialize
 
 In v2, calling `triggerEvent` while another `triggerEvent` was in flight on the same `Statemachine` instance threw `"Event dispatching is still running!"`. In v3, the second call is queued and runs after the first completes. Same for `checkTransitions`.
