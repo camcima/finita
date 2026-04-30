@@ -1,8 +1,8 @@
 import type {
   DispatcherInterface,
   CallbackInterface,
-} from "./interfaces/DispatcherInterface.js";
-import type { EventInterface } from "./interfaces/EventInterface.js";
+} from "../interfaces/DispatcherInterface.js";
+import type { EventInterface } from "../interfaces/EventInterface.js";
 
 export class Dispatcher implements DispatcherInterface {
   private commands: Array<{ event: EventInterface; args: unknown[] }> = [];
