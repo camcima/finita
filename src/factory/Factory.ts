@@ -4,13 +4,17 @@ import type { StateNameDetectorInterface } from "../interfaces/StateNameDetector
 import type { TransitionSelectorInterface } from "../interfaces/TransitionSelectorInterface.js";
 import type { MutexFactoryInterface } from "../interfaces/MutexFactoryInterface.js";
 import type { StatemachineInterface } from "../interfaces/StatemachineInterface.js";
-import type { Observer } from "../interfaces/Observer.js";
+import type { BeforeTransitionObserver } from "../interfaces/BeforeTransitionObserverInterface.js";
+import type { AfterTransitionObserver } from "../interfaces/AfterTransitionObserverInterface.js";
 import { Statemachine } from "../Statemachine.js";
 
 export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
   private readonly processDetector: ProcessDetectorInterface<TSubject>;
   private readonly stateNameDetector: StateNameDetectorInterface<TSubject> | null;
-  private readonly statemachineObservers: Set<Observer> = new Set();
+  private readonly beforeObservers: Set<BeforeTransitionObserver<TSubject>> =
+    new Set();
+  private readonly afterObservers: Set<AfterTransitionObserver<TSubject>> =
+    new Set();
   private transitionSelector: TransitionSelectorInterface<TSubject> | null =
     null;
   private mutexFactory: MutexFactoryInterface<TSubject> | null = null;
@@ -31,43 +35,42 @@ export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
     this.transitionSelector = selector;
   }
 
-  attachStatemachineObserver(observer: Observer): void {
-    this.statemachineObservers.add(observer);
+  attachBeforeObserver(observer: BeforeTransitionObserver<TSubject>): void {
+    this.beforeObservers.add(observer);
   }
 
-  detachStatemachineObserver(observer: Observer): void {
-    this.statemachineObservers.delete(observer);
+  detachBeforeObserver(observer: BeforeTransitionObserver<TSubject>): void {
+    this.beforeObservers.delete(observer);
   }
 
-  getStatemachineObservers(): Iterable<Observer> {
-    return this.statemachineObservers;
+  attachAfterObserver(observer: AfterTransitionObserver<TSubject>): void {
+    this.afterObservers.add(observer);
+  }
+
+  detachAfterObserver(observer: AfterTransitionObserver<TSubject>): void {
+    this.afterObservers.delete(observer);
   }
 
   async createStatemachine(
     subject: TSubject,
   ): Promise<StatemachineInterface<TSubject>> {
     const process = this.processDetector.detectProcess(subject);
-
     const stateName = this.stateNameDetector
       ? this.stateNameDetector.detectCurrentStateName(subject)
-      : null;
-
+      : undefined;
     const mutex = this.mutexFactory
       ? await this.mutexFactory.createMutex(subject)
-      : null;
+      : undefined;
 
-    const statemachine = new Statemachine(
-      subject,
-      process,
-      stateName,
-      this.transitionSelector,
-      mutex,
-    );
+    const sm = new Statemachine<TSubject>(subject, process, {
+      initialStateName: stateName ?? undefined,
+      transitionSelector: this.transitionSelector ?? undefined,
+      mutex: mutex ?? undefined,
+    });
 
-    for (const observer of this.statemachineObservers) {
-      statemachine.attach(observer);
-    }
+    for (const o of this.beforeObservers) sm.attachBefore(o);
+    for (const o of this.afterObservers) sm.attachAfter(o);
 
-    return statemachine;
+    return sm;
   }
 }

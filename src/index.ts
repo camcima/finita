@@ -96,9 +96,6 @@ export {
   StatefulStateNameDetector,
 } from "./factory/index.js";
 
-// Utils
-export { SetupHelper, StateCollectionMerger } from "./util/index.js";
-
 // Graph
 export { GraphBuilder } from "./graph/index.js";
 export type {
