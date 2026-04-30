@@ -1,5 +1,6 @@
 import type { TransitionSelectorInterface } from "../interfaces/TransitionSelectorInterface.js";
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
+import { AmbiguousTransitionError } from "../error/AmbiguousTransitionError.js";
 
 export class OneOrNoneActiveTransition<
   TSubject = unknown,
@@ -14,7 +15,7 @@ export class OneOrNoneActiveTransition<
       case 1:
         return arr[0];
       default:
-        throw new Error("More than one transition is active!");
+        throw new AmbiguousTransitionError(arr.length);
     }
   }
 }

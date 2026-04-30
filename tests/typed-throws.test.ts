@@ -5,6 +5,7 @@ import {
   StateEventNotFoundError,
   ProcessNotFoundError,
   InvalidSubjectError,
+  AmbiguousTransitionError,
 } from "../src/error/index.js";
 import { ProcessBuilder } from "../src/ProcessBuilder.js";
 
@@ -111,6 +112,35 @@ describe("typed throws", () => {
       expect(e.missingMembers).toEqual(["getCurrentStateName"]);
       // factory.test.ts asserts the message contains "StatefulInterface"
       expect(e.message).toContain("StatefulInterface");
+    });
+  });
+
+  describe("OneOrNoneActiveTransition.selectTransition", () => {
+    it("throws AmbiguousTransitionError with activeCount", async () => {
+      const { OneOrNoneActiveTransition } =
+        await import("../src/selector/OneOrNoneActiveTransition.js");
+      const process = new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .addState("b")
+        .addState("c")
+        .addTransition("a", "b", { event: "go" })
+        .addTransition("a", "c", { event: "go2" })
+        .build();
+      const a = process.getState("a");
+      const transitions = Array.from(a.getTransitions());
+      const selector = new OneOrNoneActiveTransition();
+      let caught: unknown;
+      try {
+        selector.selectTransition(transitions);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(AmbiguousTransitionError);
+      const e = caught as AmbiguousTransitionError;
+      expect(e.code).toBe("ambiguousTransition");
+      expect(e.activeCount).toBe(2);
+      // selector.test.ts asserts the message contains "More than one"
+      expect(e.message).toContain("More than one");
     });
   });
 });
