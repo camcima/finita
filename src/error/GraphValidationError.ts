@@ -1,3 +1,5 @@
+import { FinitaError } from "./FinitaError.js";
+
 export type GraphValidationCode =
   | "unknownTarget"
   | "unknownSource"
@@ -6,7 +8,7 @@ export type GraphValidationCode =
   | "emptyEventName"
   | "orphanState";
 
-export class GraphValidationError extends Error {
+export class GraphValidationError extends FinitaError {
   readonly code: GraphValidationCode;
   readonly details: Readonly<Record<string, unknown>>;
 

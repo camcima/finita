@@ -1,3 +1,5 @@
+import { FinitaError } from "./FinitaError.js";
+
 export interface DuplicateTransitionConflict {
   fromState: string;
   toState: string;
@@ -6,7 +8,8 @@ export interface DuplicateTransitionConflict {
   newConditionName: string | null;
 }
 
-export class DuplicateTransitionError extends Error {
+export class DuplicateTransitionError extends FinitaError {
+  readonly code = "duplicateTransition";
   readonly conflict: Readonly<DuplicateTransitionConflict>;
 
   constructor(conflict: DuplicateTransitionConflict) {

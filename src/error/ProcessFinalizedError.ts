@@ -1,4 +1,7 @@
-export class ProcessFinalizedError extends Error {
+import { FinitaError } from "./FinitaError.js";
+
+export class ProcessFinalizedError extends FinitaError {
+  readonly code = "processFinalized";
   readonly processName: string;
 
   constructor(processName: string) {
