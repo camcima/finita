@@ -1,4 +1,7 @@
-import type { AfterTransitionObserver, EnqueueContext } from "../interfaces/AfterTransitionObserverInterface.js";
+import type {
+  AfterTransitionObserver,
+  EnqueueContext,
+} from "../interfaces/AfterTransitionObserverInterface.js";
 import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js";
 
 /**
@@ -10,9 +13,9 @@ import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js"
  * after-observers registered after OnEnterObserver still see the original
  * frame, not the chained one.
  */
-export class OnEnterObserver<TSubject = unknown>
-  implements AfterTransitionObserver<TSubject>
-{
+export class OnEnterObserver<
+  TSubject = unknown,
+> implements AfterTransitionObserver<TSubject> {
   static readonly DEFAULT_EVENT_NAME = "onEnter";
 
   private readonly eventName: string;
