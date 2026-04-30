@@ -32,6 +32,7 @@
     "security:audit": "pnpm audit",
     "security:secrets": "gitleaks detect --no-banner",
     "release": "release-it",
+    "prepublishOnly": "pnpm run build && pnpm run lint && pnpm test",
     "prepare": "lefthook install"
   },
   "keywords": [
@@ -54,6 +55,9 @@
     "url": "https://github.com/camcima/finita/issues"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "packageManager": "pnpm@9.15.0",
   "pnpm": {
     "overrides": {
