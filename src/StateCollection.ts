@@ -1,5 +1,6 @@
 import type { StateCollectionInterface } from "./interfaces/StateCollectionInterface.js";
 import type { StateInterface } from "./interfaces/StateInterface.js";
+import { StateNotFoundError } from "./error/StateNotFoundError.js";
 
 export class StateCollection implements StateCollectionInterface {
   private readonly states: ReadonlyMap<string, StateInterface>;
@@ -19,7 +20,7 @@ export class StateCollection implements StateCollectionInterface {
   getState(name: string): StateInterface {
     const s = this.states.get(name);
     if (!s) {
-      throw new Error(`State "${name}" not found`);
+      throw new StateNotFoundError(name, this.states.keys());
     }
     return s;
   }

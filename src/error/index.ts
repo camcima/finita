@@ -5,5 +5,6 @@ export { DuplicateStateError } from "./DuplicateStateError.js";
 export { ProcessFinalizedError } from "./ProcessFinalizedError.js";
 export { GraphValidationError } from "./GraphValidationError.js";
 export { DuplicateTransitionError } from "./DuplicateTransitionError.js";
+export { StateNotFoundError } from "./StateNotFoundError.js";
 export type { GraphValidationCode } from "./GraphValidationError.js";
 export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";
