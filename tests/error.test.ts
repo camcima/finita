@@ -6,8 +6,7 @@ import {
   ProcessFinalizedError,
   GraphValidationError,
   DuplicateTransitionError,
-  State,
-  StateCollection,
+  ProcessBuilder,
 } from "../src/index.js";
 
 describe("WrongEventForStateError (PHP-ported)", () => {
@@ -48,19 +47,18 @@ describe("DuplicateStateError", () => {
     expect(error.name).toBe("DuplicateStateError");
   });
 
-  it("should be thrown by StateCollection.addState on duplicate name", () => {
-    const collection = new StateCollection();
-    collection.addState(new State("s1"));
-    expect(() => collection.addState(new State("s1"))).toThrow(
+  it("should be thrown by ProcessBuilder.addState on duplicate name", () => {
+    expect(() => new ProcessBuilder("p").addState("s1").addState("s1")).toThrow(
       DuplicateStateError,
     );
   });
 
-  it("should allow re-adding the same instance", () => {
-    const collection = new StateCollection();
-    const s1 = new State("s1");
-    collection.addState(s1);
-    expect(() => collection.addState(s1)).not.toThrow();
+  it("should include the duplicate state name in the error message", () => {
+    try {
+      new ProcessBuilder("p").addState("s1").addState("s1");
+    } catch (err) {
+      expect((err as DuplicateStateError).stateName).toBe("s1");
+    }
   });
 });
 

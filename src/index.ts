@@ -3,12 +3,16 @@ export type { MaybePromise } from "./MaybePromise.js";
 
 // Core classes
 export { Event } from "./Event.js";
-export { State } from "./State.js";
-export { Transition } from "./Transition.js";
-export { StateCollection } from "./StateCollection.js";
 export { Process } from "./Process.js";
+export { State } from "./State.js"; // exported for type / instanceof use only
+export { Transition } from "./Transition.js"; // same
+export { ProcessBuilder } from "./ProcessBuilder.js";
+export type {
+  AddStateOptions,
+  AddTransitionOptions,
+  BuildOptions,
+} from "./ProcessBuilder.js";
 export { Statemachine } from "./Statemachine.js";
-export { Dispatcher } from "./Dispatcher.js";
 
 // Interfaces
 export type {

@@ -1,45 +1,30 @@
 import type { StateCollectionInterface } from "./interfaces/StateCollectionInterface.js";
 import type { StateInterface } from "./interfaces/StateInterface.js";
-import { StateCollectionMerger } from "./util/StateCollectionMerger.js";
-import { DuplicateStateError } from "./error/DuplicateStateError.js";
 
 export class StateCollection implements StateCollectionInterface {
-  private readonly states: Map<string, StateInterface> = new Map();
-  private stateCollectionMerger: StateCollectionMerger | null = null;
+  private readonly states: ReadonlyMap<string, StateInterface>;
 
-  getState(name: string): StateInterface {
-    const state = this.states.get(name);
-    if (!state) {
-      throw new Error(`State "${name}" not found`);
+  constructor(states: Iterable<StateInterface>) {
+    const map = new Map<string, StateInterface>();
+    for (const s of states) {
+      map.set(s.getName(), s);
     }
-    return state;
+    this.states = map;
   }
 
   getStates(): Iterable<StateInterface> {
     return this.states.values();
   }
 
+  getState(name: string): StateInterface {
+    const s = this.states.get(name);
+    if (!s) {
+      throw new Error(`State "${name}" not found`);
+    }
+    return s;
+  }
+
   hasState(name: string): boolean {
     return this.states.has(name);
-  }
-
-  addState(state: StateInterface): void {
-    const existing = this.states.get(state.getName());
-    if (existing && existing !== state) {
-      throw new DuplicateStateError(state.getName());
-    }
-    this.states.set(state.getName(), state);
-  }
-
-  getStateCollectionMerger(): StateCollectionMerger {
-    if (!this.stateCollectionMerger) {
-      this.stateCollectionMerger = new StateCollectionMerger(this);
-    }
-    return this.stateCollectionMerger;
-  }
-
-  merge(source: StateCollectionInterface): void {
-    const merger = this.getStateCollectionMerger();
-    merger.merge(source);
   }
 }
