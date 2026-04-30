@@ -87,8 +87,9 @@ describe("Statemachine mutex regression", () => {
   it("does not short-circuit when isAcquired returns true (closes #1)", async () => {
     const fakeMutex: MutexInterface = {
       acquireLock: vi.fn(async () => false),
-      releaseLock: vi.fn(async () => {}),
+      releaseLock: vi.fn(async () => true),
       isAcquired: vi.fn(() => true),
+      isLocked: vi.fn(() => true),
     };
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })

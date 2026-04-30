@@ -7,6 +7,7 @@ import {
   ScoreTransition,
   WeightTransition,
 } from "../src/index.js";
+import type { TransitionInterface } from "../src/index.js";
 
 /** Helper: build a process and extract all transitions from a state. */
 function buildTransitions(
@@ -19,7 +20,7 @@ function buildTransitions(
       | InstanceType<typeof Tautology>;
     weight?: number;
   }>,
-): ReturnType<typeof Array.from> {
+): TransitionInterface[] {
   const stateNames = new Set<string>();
   for (const s of specs) {
     stateNames.add(s.from);
@@ -39,7 +40,9 @@ function buildTransitions(
     });
   }
   const process = builder.build();
-  return Array.from(process.getState(specs[0]!.from).getTransitions());
+  return Array.from(
+    process.getState(specs[0]!.from).getTransitions(),
+  ) as TransitionInterface[];
 }
 
 describe("OneOrNoneActiveTransition", () => {
