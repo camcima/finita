@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   ProcessBuilder,
   Tautology,
-  Contradiction,
   CallbackCondition,
   ProcessFinalizedError,
   GraphValidationError,
@@ -167,7 +166,7 @@ describe("ProcessBuilder", () => {
     ).toThrow(GraphValidationError);
   });
 
-  it("dedups transitions with same (from, event, to, conditionName)", () => {
+  it("dedups transitions with the same condition reference", () => {
     const cond = new Tautology();
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })
@@ -178,27 +177,23 @@ describe("ProcessBuilder", () => {
     expect(Array.from(process.getState("a").getTransitions())).toHaveLength(1);
   });
 
-  it("rejects conflicting duplicate transitions (closes #6)", () => {
+  it("rejects two different condition instances sharing a name (closes #6)", () => {
+    // Original review #6 bug: two CallbackCondition objects with the
+    // same name "shared" but different logic were silently deduplicated
+    // because the dedup key included condition.getName(). v3 must treat
+    // these as conflicting — different object identity = different logic
+    // (we cannot introspect callable bodies), so the second declaration
+    // would silently override the first if dedup'd.
     const c1 = new CallbackCondition("shared", async () => true);
     const c2 = new CallbackCondition("shared", async () => false);
-    // Same name "shared" but different identity AND different logic.
-    // Identity differs but name matches → according to spec, condition name
-    // is the dedup key, so this is dedup'd. We instead test the conflict
-    // case: same name? actually, condition.getName() comparison says
-    // same name → dedup. To test the conflict path:
-    const c3 = new Tautology(); // name "Tautology"
-    const c4 = new Contradiction(); // name "Contradiction"
     expect(() =>
       new ProcessBuilder("p")
         .addState("a", { initial: true })
         .addState("b")
-        .addTransition("a", "b", { event: "go", condition: c3 })
-        .addTransition("a", "b", { event: "go", condition: c4 })
+        .addTransition("a", "b", { event: "go", condition: c1 })
+        .addTransition("a", "b", { event: "go", condition: c2 })
         .build(),
     ).toThrow(DuplicateTransitionError);
-    // Suppress unused variable warnings
-    void c1;
-    void c2;
   });
 
   it("strictOrphans rejects unreachable states", () => {
