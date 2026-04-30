@@ -173,3 +173,76 @@ sm.attachAfter(new StatefulStatusChanger(subject));
 ```
 
 The v2 reflective subject lookup is gone; explicit injection makes the contract typed.
+
+## 12. Typed errors with a shared `FinitaError` base
+
+All library errors now extend an abstract `FinitaError` base that carries a
+`code: string` discriminant. Code that previously matched on a generic
+`Error` message can switch to a typed `instanceof` check or a `code` switch:
+
+```ts
+import { FinitaError } from "@camcima/finita";
+
+try {
+  await sm.triggerEvent("go");
+} catch (err) {
+  if (err instanceof FinitaError) {
+    switch (err.code) {
+      case "wrongEventForState":
+        /* ... */ break;
+      case "automaticTransitionCycle":
+        /* ... */ break;
+      default: /* ... */
+    }
+  }
+  throw err;
+}
+```
+
+Throw sites that previously raised generic `new Error(...)` now raise typed
+classes. Existing message strings are preserved (or extended with structured
+prefixes), so substring matchers continue to work; classes are the
+recommended check.
+
+| Old throw site                                            | New error class                 | `code`                       |
+| --------------------------------------------------------- | ------------------------------- | ---------------------------- |
+| `StateCollection.getState(name)` not found                | `StateNotFoundError`            | `"stateNotFound"`            |
+| `State.getEvent(name)` not declared                       | `StateEventNotFoundError`       | `"stateEventNotFound"`       |
+| `AbstractNamedProcessDetector.detectProcess` unknown name | `ProcessNotFoundError`          | `"processNotFound"`          |
+| `StatefulStateNameDetector` non-stateful subject          | `InvalidSubjectError`           | `"invalidSubject"`           |
+| `OneOrNoneActiveTransition.selectTransition` ambiguous    | `AmbiguousTransitionError`      | `"ambiguousTransition"`      |
+| `Statemachine` automatic-transition cycle                 | `AutomaticTransitionCycleError` | `"automaticTransitionCycle"` |
+
+The retrofitted classes from earlier tasks pick up matching codes:
+
+| Class                       | `code`                                |
+| --------------------------- | ------------------------------------- |
+| `DuplicateStateError`       | `"duplicateState"`                    |
+| `DuplicateTransitionError`  | `"duplicateTransition"`               |
+| `GraphValidationError`      | (existing `GraphValidationCode` enum) |
+| `LockCanNotBeAcquiredError` | `"lockCanNotBeAcquired"`              |
+| `ProcessFinalizedError`     | `"processFinalized"`                  |
+| `WrongEventForStateError`   | `"wrongEventForState"`                |
+
+## 13. Stricter event-name and condition-name validation
+
+`ProcessBuilder.addTransition` now rejects:
+
+- Event names that are empty, whitespace-only, **or** contain leading/trailing
+  whitespace. Code: `GraphValidationError` with `code: "invalidEventName"`.
+- `ConditionInterface` instances whose `getName()` returns an empty or
+  whitespace-only string. Code: `GraphValidationError` with
+  `code: "invalidConditionName"`.
+
+The `GraphValidationCode` union has changed: the literal `"emptyEventName"`
+is **removed** in favour of `"invalidEventName"` (which covers both empty
+and padded names) and `"invalidConditionName"` is added.
+
+If you trigger this in v3.0.0, trim the names before passing them in.
+
+## 14. `GraphBuilder.addState` is now idempotent
+
+Calling `GraphBuilder.addState(s)` twice for the same state previously
+deduplicated the node but appended duplicate edges. In v3.0.0 the second
+call is a no-op for both nodes and edges. If you relied on the old
+duplicate-edge behaviour, instantiate a fresh `GraphBuilder` per pass.

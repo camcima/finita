@@ -4,13 +4,19 @@ Custom error classes thrown by the state machine.
 
 ## Table of Contents
 
+- [FinitaError](#finitaerror)
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
 - [DuplicateStateError](#duplicatestateerror)
 - [ProcessFinalizedError](#processfinalizederror)
 - [GraphValidationError](#graphvalidationerror)
 - [DuplicateTransitionError](#duplicatetransitionerror)
-- [Automatic Transition Cycle Error](#automatic-transition-cycle-error)
+- [StateNotFoundError](#statenotfounderror)
+- [StateEventNotFoundError](#stateeventnotfounderror)
+- [ProcessNotFoundError](#processnotfounderror)
+- [InvalidSubjectError](#invalidsubjecterror)
+- [AmbiguousTransitionError](#ambiguoustransitionerror)
+- [AutomaticTransitionCycleError](#automatictransitioncycleerror)
 
 ---
 
@@ -192,14 +198,15 @@ Thrown by `ProcessBuilder.build()` when the declared graph has a structural prob
 
 ### `GraphValidationCode` values
 
-| Code                    | When                                                           |
-| ----------------------- | -------------------------------------------------------------- |
-| `missingInitialState`   | No state was declared with `{ initial: true }`                 |
-| `multipleInitialStates` | More than one state declared with `{ initial: true }`          |
-| `unknownTarget`         | A transition's `toState` name was never passed to `addState`   |
-| `unknownSource`         | A transition's `fromState` name was never passed to `addState` |
-| `emptyEventName`        | `addTransition` was called with an empty/whitespace event name |
-| `orphanState`           | Unreachable state found (only when `strictOrphans: true`)      |
+| Code                    | When                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `missingInitialState`   | No state was declared with `{ initial: true }`                                             |
+| `multipleInitialStates` | More than one state declared with `{ initial: true }`                                      |
+| `unknownTarget`         | A transition's `toState` name was never passed to `addState`                               |
+| `unknownSource`         | A transition's `fromState` name was never passed to `addState`                             |
+| `invalidEventName`      | `addTransition` was called with an empty, whitespace-only, or whitespace-padded event name |
+| `invalidConditionName`  | `addTransition` was called with a condition whose `getName()` returns empty/whitespace     |
+| `orphanState`           | Unreachable state found (only when `strictOrphans: true`)                                  |
 
 ### Example
 
@@ -277,50 +284,141 @@ try {
 
 ---
 
-## Automatic Transition Cycle Error
+## FinitaError
 
-Thrown when automatic transitions (no event name) form a cycle. This includes self-transitions (s1 → s1) and multi-state cycles (s1 → s2 → s1, s1 → s2 → s3 → s1, etc.). Without detection, these would cause infinite recursion since conditions would be re-evaluated immediately and the loop would never terminate.
+**Import:** `import { FinitaError } from '@camcima/finita'`
 
-### Message
+Abstract base class for every error thrown by `@camcima/finita`. Every typed
+error class in this document extends `FinitaError`. Use `instanceof FinitaError`
+to catch any library-thrown error in one branch.
 
-```
-Automatic transition cycle detected: state "{stateName}" was already visited — this would cause infinite recursion
-```
+### Properties
 
-This error is wrapped by the state machine's transition error handler, so the outer error message will be:
+| Property  | Type     | Description                                                    |
+| --------- | -------- | -------------------------------------------------------------- |
+| `code`    | `string` | Discriminator unique to each subclass (e.g. `"stateNotFound"`) |
+| `message` | `string` | Human-readable description                                     |
+| `name`    | `string` | The subclass name                                              |
 
-```
-Exception was thrown when doing a transition from current state "{stateName}"
-```
-
-with the cycle error available via `error.cause` (possibly nested multiple levels for multi-state cycles).
-
-### When It's Thrown
-
-When `checkTransitions()` or `triggerEvent()` follows a chain of automatic transitions and encounters a state that was already visited in the current chain.
-
-### How to Fix
-
-Break the cycle by using event-based transitions for at least one edge:
+### Example
 
 ```typescript
-import { ProcessBuilder, CallbackCondition } from "@camcima/finita";
+import { FinitaError } from "@camcima/finita";
 
-const condition = new CallbackCondition("check", (s) => (s as any).ready);
-
-// BAD: automatic cycle — will throw at runtime
-const bad = new ProcessBuilder("bad")
-  .addState("s1", { initial: true })
-  .addState("s2")
-  .addTransition("s1", "s2", { condition })
-  .addTransition("s2", "s1", { condition }) // cycle!
-  .build();
-
-// GOOD: use an event to break the cycle
-const good = new ProcessBuilder("good")
-  .addState("s1", { initial: true })
-  .addState("s2")
-  .addTransition("s1", "s2", { condition })
-  .addTransition("s2", "s1", { event: "retry", condition })
-  .build();
+try {
+  await statemachine.triggerEvent("go");
+} catch (err) {
+  if (err instanceof FinitaError) {
+    switch (err.code) {
+      case "wrongEventForState":
+        /* ... */ break;
+      case "automaticTransitionCycle":
+        /* ... */ break;
+      default: /* ... */
+    }
+  } else {
+    throw err;
+  }
+}
 ```
+
+---
+
+## StateNotFoundError
+
+**Import:** `import { StateNotFoundError } from '@camcima/finita'`
+
+Thrown by `StateCollection.getState(name)` when no state with that name exists.
+
+### Properties
+
+| Property          | Type                | Description                              |
+| ----------------- | ------------------- | ---------------------------------------- |
+| `code`            | `"stateNotFound"`   | Discriminator                            |
+| `stateName`       | `string`            | The name that was looked up              |
+| `availableStates` | `readonly string[]` | Names that are present in the collection |
+| `name`            | `string`            | `'StateNotFoundError'`                   |
+
+---
+
+## StateEventNotFoundError
+
+**Import:** `import { StateEventNotFoundError } from '@camcima/finita'`
+
+Thrown by `State.getEvent(name)` when the named event is not declared on the state.
+
+### Properties
+
+| Property    | Type                   | Description                       |
+| ----------- | ---------------------- | --------------------------------- |
+| `code`      | `"stateEventNotFound"` | Discriminator                     |
+| `stateName` | `string`               | The state being queried           |
+| `eventName` | `string`               | The event name that was looked up |
+| `name`      | `string`               | `'StateEventNotFoundError'`       |
+
+---
+
+## ProcessNotFoundError
+
+**Import:** `import { ProcessNotFoundError } from '@camcima/finita'`
+
+Thrown by `AbstractNamedProcessDetector.detectProcess(subject)` when no process matches the detected name.
+
+### Properties
+
+| Property             | Type                | Description                                   |
+| -------------------- | ------------------- | --------------------------------------------- |
+| `code`               | `"processNotFound"` | Discriminator                                 |
+| `processName`        | `string`            | The process name that was detected            |
+| `availableProcesses` | `readonly string[]` | Names of processes registered on the detector |
+| `name`               | `string`            | `'ProcessNotFoundError'`                      |
+
+---
+
+## InvalidSubjectError
+
+**Import:** `import { InvalidSubjectError } from '@camcima/finita'`
+
+Thrown by `StatefulStateNameDetector.detectCurrentStateName(subject)` (and any future detector with a structural subject contract) when the subject does not satisfy the expected interface.
+
+### Properties
+
+| Property            | Type                | Description                                         |
+| ------------------- | ------------------- | --------------------------------------------------- |
+| `code`              | `"invalidSubject"`  | Discriminator                                       |
+| `expectedInterface` | `string`            | Name of the interface the subject failed to satisfy |
+| `missingMembers`    | `readonly string[]` | Method/property names that were absent              |
+| `name`              | `string`            | `'InvalidSubjectError'`                             |
+
+---
+
+## AmbiguousTransitionError
+
+**Import:** `import { AmbiguousTransitionError } from '@camcima/finita'`
+
+Thrown by `OneOrNoneActiveTransition.selectTransition(transitions)` when more than one transition is simultaneously active.
+
+### Properties
+
+| Property      | Type                    | Description                      |
+| ------------- | ----------------------- | -------------------------------- |
+| `code`        | `"ambiguousTransition"` | Discriminator                    |
+| `activeCount` | `number`                | How many transitions were active |
+| `name`        | `string`                | `'AmbiguousTransitionError'`     |
+
+---
+
+## AutomaticTransitionCycleError
+
+**Import:** `import { AutomaticTransitionCycleError } from '@camcima/finita'`
+
+Thrown by `Statemachine` when an automatic-transition cycle is detected during `triggerEvent` / `checkTransitions`. Indicates the graph would loop forever.
+
+### Properties
+
+| Property            | Type                         | Description                             |
+| ------------------- | ---------------------------- | --------------------------------------- |
+| `code`              | `"automaticTransitionCycle"` | Discriminator                           |
+| `targetStateName`   | `string`                     | The state already visited in this run   |
+| `visitedStateNames` | `readonly string[]`          | The states visited so far in this drive |
+| `name`              | `string`                     | `'AutomaticTransitionCycleError'`       |
