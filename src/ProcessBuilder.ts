@@ -88,6 +88,16 @@ export class ProcessBuilder<TSubject = unknown> {
       }
       eventName = raw;
     }
+    if (options.condition) {
+      const conditionName = options.condition.getName();
+      if (conditionName.trim() === "") {
+        throw new GraphValidationError(
+          "invalidConditionName",
+          `addTransition called with an empty/whitespace condition name from "${fromState}" to "${toState}"`,
+          { fromState, toState, conditionName },
+        );
+      }
+    }
     this.transitionSpecs.push({
       fromState,
       toState,

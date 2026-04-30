@@ -65,3 +65,52 @@ describe("ProcessBuilder.addTransition whitespace validation", () => {
     expect(() => b.addTransition("a", "b", { event: "go" })).not.toThrow();
   });
 });
+
+describe("ProcessBuilder.addTransition condition-name validation", () => {
+  const trueCondition = (name: string) => ({
+    getName: () => name,
+    isActive: () => true,
+    checkCondition: () => true,
+  });
+
+  it("rejects empty condition name with code invalidConditionName", () => {
+    const b = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b");
+    expect(() =>
+      b.addTransition("a", "b", { event: "go", condition: trueCondition("") }),
+    ).toThrow(GraphValidationError);
+    try {
+      b.addTransition("a", "b", {
+        event: "go",
+        condition: trueCondition(""),
+      });
+    } catch (err) {
+      expect((err as GraphValidationError).code).toBe("invalidConditionName");
+    }
+  });
+
+  it("rejects whitespace-only condition name", () => {
+    const b = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b");
+    expect(() =>
+      b.addTransition("a", "b", {
+        event: "go",
+        condition: trueCondition("   "),
+      }),
+    ).toThrow(GraphValidationError);
+  });
+
+  it("accepts a clean condition name", () => {
+    const b = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b");
+    expect(() =>
+      b.addTransition("a", "b", {
+        event: "go",
+        condition: trueCondition("isReady"),
+      }),
+    ).not.toThrow();
+  });
+});
