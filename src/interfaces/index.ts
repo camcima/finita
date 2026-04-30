@@ -15,6 +15,7 @@ export type { StateInterface } from "./StateInterface.js";
 export type { StateCollectionInterface } from "./StateCollectionInterface.js";
 export type { ProcessInterface } from "./ProcessInterface.js";
 export type { StatemachineInterface } from "./StatemachineInterface.js";
+export type { StatemachineOptions } from "./StatemachineOptions.js";
 export type { MutexInterface } from "./MutexInterface.js";
 export type { MutexFactoryInterface } from "./MutexFactoryInterface.js";
 export type { LockAdapterInterface } from "./LockAdapterInterface.js";

@@ -27,6 +27,7 @@ export type {
   StateCollectionInterface,
   ProcessInterface,
   StatemachineInterface,
+  StatemachineOptions,
   MutexInterface,
   MutexFactoryInterface,
   LockAdapterInterface,
