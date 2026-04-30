@@ -55,4 +55,27 @@ describe("GraphBuilder.addState idempotency (#14)", () => {
 
     expect(twice.getGraph().edges.length).toBe(once.getGraph().edges.length);
   });
+
+  it("addState twice produces edges with identical content as once", () => {
+    const process = build();
+    const a = process.getState("a");
+
+    const once = new GraphBuilder();
+    once.addState(a);
+
+    const twice = new GraphBuilder();
+    twice.addState(a);
+    twice.addState(a);
+
+    const onceTuples = once
+      .getGraph()
+      .edges.map((e) => `${e.source}->${e.target}|${e.label}`)
+      .sort();
+    const twiceTuples = twice
+      .getGraph()
+      .edges.map((e) => `${e.source}->${e.target}|${e.label}`)
+      .sort();
+
+    expect(twiceTuples).toEqual(onceTuples);
+  });
 });
