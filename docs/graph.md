@@ -56,26 +56,29 @@ W: weight           (always included)
 
 ```typescript
 import {
+  ProcessBuilder,
   GraphBuilder,
-  State,
-  Transition,
-  Process,
   CallbackCondition,
 } from "@camcima/finita";
 
-const draft = new State("draft");
-const review = new State("review");
-const published = new State("published");
-
 const isComplete = new CallbackCondition("isComplete", () => true);
-draft.addTransition(new Transition(review, "submit"));
-review.addTransition(new Transition(published, "approve", isComplete));
-review.addTransition(new Transition(draft, "reject"));
+
+const process = new ProcessBuilder("workflow")
+  .addState("draft", { initial: true })
+  .addState("review")
+  .addState("published")
+  .addTransition("draft", "review", { event: "submit" })
+  .addTransition("review", "published", {
+    event: "approve",
+    condition: isComplete,
+  })
+  .addTransition("review", "draft", { event: "reject" })
+  .build();
 
 const builder = new GraphBuilder();
-builder.addState(draft);
-builder.addState(review);
-builder.addState(published);
+builder.addState(process.getState("draft"));
+builder.addState(process.getState("review"));
+builder.addState(process.getState("published"));
 
 const graph = builder.getGraph();
 
@@ -96,7 +99,6 @@ for (const edge of graph.edges) {
 ### Using with a Process
 
 ```typescript
-const process = new Process("workflow", draft);
 const builder = new GraphBuilder();
 builder.addStateCollection(process);
 const graph = builder.getGraph();

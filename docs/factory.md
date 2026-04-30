@@ -88,7 +88,7 @@ const factory = new Factory(
 
 // Configure
 factory.setTransitionSelector(new ScoreTransition());
-factory.attachStatemachineObserver(new StatefulStatusChanger());
+factory.attachStatemachineObserver(new StatefulStatusChanger(order1)); // subject injected at construction
 factory.attachStatemachineObserver(new TransitionLogger(logger));
 
 // Create state machines -- all configuration is applied automatically
@@ -266,9 +266,7 @@ Putting it all together -- a production-ready factory setup with typed generics:
 
 ```typescript
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Factory,
   SingleProcessDetector,
   StatefulStateNameDetector,
@@ -277,7 +275,6 @@ import {
   TransitionLogger,
   ScoreTransition,
   MutexFactory,
-  CallbackCondition,
   CallbackObserver,
 } from "@camcima/finita";
 import type {
@@ -293,24 +290,26 @@ interface Article extends StatefulInterface {
 }
 
 // 1. Define the process
-const draft = new State("draft");
-const review = new State("review");
-const published = new State("published");
-const archived = new State("archived");
+const articleProcess = new ProcessBuilder<Article>("article-workflow")
+  .addState("draft", { initial: true })
+  .addState("review")
+  .addState("published")
+  .addState("archived")
+  .addTransition("draft", "review", { event: "submit" })
+  .addTransition("review", "published", { event: "approve" })
+  .addTransition("review", "draft", { event: "reject" })
+  .addTransition("published", "archived", { event: "archive" })
+  .build();
 
-draft.addTransition(new Transition(review, "submit"));
-review.addTransition(new Transition(published, "approve"));
-review.addTransition(new Transition(draft, "reject"));
-published.addTransition(new Transition(archived, "archive"));
-
-// Attach commands
-draft.getEvent("submit").attach(
-  new CallbackObserver((subject) => {
-    (subject as Article).submittedAt = new Date();
-  }),
-);
-
-const articleProcess = new Process("article-workflow", draft);
+// Attach commands to events
+articleProcess
+  .getState("draft")
+  .getEvent("submit")
+  .attach(
+    new CallbackObserver((subject) => {
+      (subject as Article).submittedAt = new Date();
+    }),
+  );
 
 // 2. Set up the factory with typed generics
 const factory = new Factory<Article>(
@@ -320,8 +319,8 @@ const factory = new Factory<Article>(
 
 factory.setTransitionSelector(new ScoreTransition<Article>());
 
-// 3. Register observers
-factory.attachStatemachineObserver(new StatefulStatusChanger());
+// 3. Register observers -- StatefulStatusChanger requires the subject at construction;
+//    when used with Factory, pass the subject inside createStatemachine or use a wrapper
 factory.attachStatemachineObserver(new OnEnterObserver());
 factory.attachStatemachineObserver(new TransitionLogger(logger));
 
@@ -332,7 +331,9 @@ factory.setMutexFactory(
 
 // 5. Use the factory -- returns StatemachineInterface<Article>
 async function getStatemachine(article: Article) {
-  return factory.createStatemachine(article);
+  const sm = await factory.createStatemachine(article);
+  sm.attachAfter(new StatefulStatusChanger(article));
+  return sm;
 }
 
 // Create or restore state machines for any article

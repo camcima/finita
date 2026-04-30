@@ -7,6 +7,9 @@ Custom error classes thrown by the state machine.
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
 - [DuplicateStateError](#duplicatestateerror)
+- [ProcessFinalizedError](#processfinalizederror)
+- [GraphValidationError](#graphvalidationerror)
+- [DuplicateTransitionError](#duplicatetransitionerror)
 - [Automatic Transition Cycle Error](#automatic-transition-cycle-error)
 
 ---
@@ -116,13 +119,12 @@ Thrown when a `StateCollection` or `Process` constructor encounters a different 
 ### Example
 
 ```typescript
-import { DuplicateStateError, State, StateCollection } from "@camcima/finita";
-
-const collection = new StateCollection();
-collection.addState(new State("open"));
+import { DuplicateStateError, ProcessBuilder } from "@camcima/finita";
 
 try {
-  collection.addState(new State("open")); // Different instance, same name
+  new ProcessBuilder("example")
+    .addState("open", { initial: true })
+    .addState("open"); // Duplicate name — throws
 } catch (error) {
   if (error instanceof DuplicateStateError) {
     console.log(`Duplicate state: "${error.stateName}"`);
@@ -132,9 +134,146 @@ try {
 
 ### When It's Thrown
 
-- `StateCollection.addState()` is called with a state whose name matches an existing state (different instance)
-- `Process` constructor discovers two different state instances with the same name while walking transitions
-- Re-adding the **same instance** is allowed (idempotent)
+- `ProcessBuilder.addState()` is called with a name that was already declared
+
+---
+
+## ProcessFinalizedError
+
+**Import:** `import { ProcessFinalizedError } from '@camcima/finita'`
+
+Thrown when `ProcessBuilder.build()` is called more than once on the same builder instance. A builder is single-use: once `build()` succeeds, the builder is finalized and all further mutations or build calls are rejected.
+
+### Properties
+
+| Property      | Type     | Description                                              |
+| ------------- | -------- | -------------------------------------------------------- |
+| `processName` | `string` | The name of the finalized process                        |
+| `message`     | `string` | Contains the process name and a description of the error |
+| `name`        | `string` | `'ProcessFinalizedError'`                                |
+
+### Example
+
+```typescript
+import { ProcessBuilder, ProcessFinalizedError } from "@camcima/finita";
+
+const builder = new ProcessBuilder("workflow")
+  .addState("start", { initial: true })
+  .addState("end")
+  .addTransition("start", "end", { event: "finish" });
+
+const process = builder.build(); // OK
+
+try {
+  builder.build(); // Throws — builder already finalized
+} catch (error) {
+  if (error instanceof ProcessFinalizedError) {
+    console.log(`Builder for "${error.processName}" was already used`);
+  }
+}
+```
+
+---
+
+## GraphValidationError
+
+**Import:** `import { GraphValidationError } from '@camcima/finita'`
+
+Thrown by `ProcessBuilder.build()` when the declared graph has a structural problem. The `code` property identifies the specific violation.
+
+### Properties
+
+| Property  | Type                      | Description                                            |
+| --------- | ------------------------- | ------------------------------------------------------ |
+| `code`    | `GraphValidationCode`     | A machine-readable code identifying the violation type |
+| `details` | `Record<string, unknown>` | Additional context (state names, etc.)                 |
+| `message` | `string`                  | Human-readable description including the code          |
+| `name`    | `string`                  | `'GraphValidationError'`                               |
+
+### `GraphValidationCode` values
+
+| Code                    | When                                                           |
+| ----------------------- | -------------------------------------------------------------- |
+| `missingInitialState`   | No state was declared with `{ initial: true }`                 |
+| `multipleInitialStates` | More than one state declared with `{ initial: true }`          |
+| `unknownTarget`         | A transition's `toState` name was never passed to `addState`   |
+| `unknownSource`         | A transition's `fromState` name was never passed to `addState` |
+| `emptyEventName`        | `addTransition` was called with an empty/whitespace event name |
+| `orphanState`           | Unreachable state found (only when `strictOrphans: true`)      |
+
+### Example
+
+```typescript
+import { ProcessBuilder, GraphValidationError } from "@camcima/finita";
+
+try {
+  new ProcessBuilder("bad")
+    .addState("start", { initial: true })
+    .addTransition("start", "nonexistent", { event: "go" }) // unknown target
+    .build();
+} catch (error) {
+  if (error instanceof GraphValidationError) {
+    console.log(error.code); // 'unknownTarget'
+    console.log(error.details); // { fromState: 'start', toState: 'nonexistent', eventName: 'go' }
+  }
+}
+```
+
+---
+
+## DuplicateTransitionError
+
+**Import:** `import { DuplicateTransitionError } from '@camcima/finita'`
+
+Thrown by `ProcessBuilder.build()` when two `addTransition` calls describe the same `(fromState, event, toState)` triple but reference different condition objects with different names. Same-identity duplicates (same condition name) are silently deduplicated; conflicting duplicates (different condition names, same endpoint triple) are an error.
+
+### Properties
+
+| Property   | Type                          | Description                                    |
+| ---------- | ----------------------------- | ---------------------------------------------- |
+| `conflict` | `DuplicateTransitionConflict` | Object describing the conflicting declarations |
+| `message`  | `string`                      | Human-readable description of the conflict     |
+| `name`     | `string`                      | `'DuplicateTransitionError'`                   |
+
+### `DuplicateTransitionConflict` shape
+
+```typescript
+interface DuplicateTransitionConflict {
+  fromState: string;
+  toState: string;
+  eventName: string | null;
+  existingConditionName: string | null;
+  newConditionName: string | null;
+}
+```
+
+### Example
+
+```typescript
+import {
+  ProcessBuilder,
+  DuplicateTransitionError,
+  CallbackCondition,
+} from "@camcima/finita";
+
+const c1 = new CallbackCondition("conditionA", () => true);
+const c2 = new CallbackCondition("conditionB", () => false);
+
+try {
+  new ProcessBuilder("conflict")
+    .addState("draft", { initial: true })
+    .addState("submitted")
+    .addTransition("draft", "submitted", { event: "submit", condition: c1 })
+    .addTransition("draft", "submitted", { event: "submit", condition: c2 }) // conflict!
+    .build();
+} catch (error) {
+  if (error instanceof DuplicateTransitionError) {
+    console.log(error.conflict.fromState); // 'draft'
+    console.log(error.conflict.existingConditionName); // 'conditionA'
+    console.log(error.conflict.newConditionName); // 'conditionB'
+  }
+}
+```
 
 ---
 
@@ -165,11 +304,23 @@ When `checkTransitions()` or `triggerEvent()` follows a chain of automatic trans
 Break the cycle by using event-based transitions for at least one edge:
 
 ```typescript
-// BAD: automatic cycle — will throw
-s1.addTransition(new Transition(s2, null, condition));
-s2.addTransition(new Transition(s1, null, condition));
+import { ProcessBuilder, CallbackCondition } from "@camcima/finita";
+
+const condition = new CallbackCondition("check", (s) => (s as any).ready);
+
+// BAD: automatic cycle — will throw at runtime
+const bad = new ProcessBuilder("bad")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  .addTransition("s1", "s2", { condition })
+  .addTransition("s2", "s1", { condition }) // cycle!
+  .build();
 
 // GOOD: use an event to break the cycle
-s1.addTransition(new Transition(s2, null, condition));
-s2.addTransition(new Transition(s1, "retry", condition));
+const good = new ProcessBuilder("good")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  .addTransition("s1", "s2", { condition })
+  .addTransition("s2", "s1", { event: "retry", condition })
+  .build();
 ```

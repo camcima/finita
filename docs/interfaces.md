@@ -15,7 +15,6 @@ classDiagram
     Metadata <|-- StateInterface
     Weighted <|-- TransitionInterface
     ObservableSubject <|-- EventInterface
-    ObservableSubject <|-- StatemachineInterface
 
     StateCollectionInterface <|-- ProcessInterface
 
@@ -42,6 +41,8 @@ classDiagram
 - [Mutex Interfaces](#mutex-interfaces)
 - [Dispatcher Interfaces](#dispatcher-interfaces)
 - [Utility Interfaces](#utility-interfaces)
+
+> **Import all types:** `import type { InterfaceName } from '@camcima/finita'`
 
 ---
 
@@ -117,16 +118,15 @@ interface EventInterface extends Named, Metadata, ObservableSubject {
 ```typescript
 interface StateInterface extends Named, Metadata {
   getTransitions(): Iterable<TransitionInterface>;
-  addTransition(transition: TransitionInterface): void;
   getEventNames(): string[];
   hasEvent(name: string): boolean;
   getEvent(name: string): EventInterface;
   getMetadataValue(key: string): unknown;
-  setMetadataValue(key: string, value: unknown): void;
   hasMetadataValue(key: string): boolean;
-  deleteMetadataValue(key: string): void;
 }
 ```
+
+> **v3:** `addTransition`, `setMetadataValue`, and `deleteMetadataValue` are no longer on `StateInterface`. Declare these at graph construction time through `ProcessBuilder`.
 
 ### TransitionInterface
 
@@ -156,7 +156,7 @@ interface StateCollectionInterface {
 }
 ```
 
-Mutation methods (`addState`, `merge`) are available only on the concrete `StateCollection` class.
+> **v3:** `StateCollection` is an internal implementation detail. Use `ProcessInterface` (which extends `StateCollectionInterface`) to access states.
 
 ### ProcessInterface
 
@@ -171,28 +171,32 @@ Note: `ProcessInterface` extends both `Named` and `StateCollectionInterface`. A 
 ### StatemachineInterface
 
 ```typescript
-interface StatemachineInterface<TSubject = unknown> extends ObservableSubject {
+interface StatemachineInterface<TSubject = unknown> {
   getCurrentState(): StateInterface;
   getSubject(): TSubject;
   getProcess(): ProcessInterface;
+  getLastState(): StateInterface | null;
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void>;
   checkTransitions(context?: Map<string, unknown>): Promise<void>;
-  getSelectedTransition(): TransitionInterface<TSubject> | null;
-  getLastState(): StateInterface | null;
-  getCurrentContext(): Map<string, unknown> | null;
   acquireLock(): Promise<boolean>;
   releaseLock(): Promise<void>;
   isLockAcquired(): boolean;
   isAutoreleaseLock(): boolean;
   setAutoreleaseLock(autorelease: boolean): void;
+  attachBefore(observer: BeforeTransitionObserver<TSubject>): void;
+  attachAfter(observer: AfterTransitionObserver<TSubject>): void;
 }
 ```
+
+> **v3:** `getSelectedTransition()`, `getCurrentContext()`, `attach()`, `detach()`, `notify()`, and `getObservers()` are removed. Read transition/context data from the `TransitionFrame` inside an observer. Use `attachBefore`/`attachAfter` instead of `attach`.
 
 ---
 
 ## Observer Interfaces
 
 ### Observer
+
+Used for **event observers** — attached to `Event` objects on a state. Unchanged from v2.
 
 ```typescript
 interface Observer {
@@ -209,6 +213,58 @@ interface ObservableSubject {
   notify(): Promise<void>;
   getObservers(): Iterable<Observer>;
 }
+```
+
+### BeforeTransitionObserver
+
+Runs before a transition commits. Throwing aborts the transition.
+
+```typescript
+interface BeforeTransitionObserver<TSubject = unknown> {
+  notify(frame: ProposedTransitionFrame<TSubject>): MaybePromise<void>;
+}
+```
+
+### AfterTransitionObserver
+
+Runs after a transition commits. Throwing does not roll back state.
+
+```typescript
+interface AfterTransitionObserver<TSubject = unknown> {
+  notify(
+    frame: TransitionFrame<TSubject>,
+    ctx: EnqueueContext,
+  ): MaybePromise<void>;
+}
+```
+
+### EnqueueContext
+
+```typescript
+interface EnqueueContext {
+  enqueue(event: string, context?: Map<string, unknown>): void;
+}
+```
+
+### TransitionFrame / ProposedTransitionFrame
+
+```typescript
+interface TransitionFrame<TSubject = unknown> {
+  readonly fromState: StateInterface;
+  readonly toState: StateInterface;
+  readonly transition: TransitionInterface<TSubject>;
+  readonly event: EventInterface | null;
+  readonly condition: ConditionInterface<TSubject> | null;
+  readonly context: ReadonlyMap<string, unknown>;
+  readonly timestamp: number;
+  readonly machineName: string | null;
+}
+
+// ProposedTransitionFrame is the same shape — used in before-observers.
+// toState is the proposed target; currentState is still fromState at call time.
+interface ProposedTransitionFrame<
+  TSubject = unknown,
+> extends TransitionFrame<TSubject> {}
 ```
 
 ---
@@ -239,9 +295,19 @@ interface FactoryInterface<TSubject = unknown> {
   ): Promise<StatemachineInterface<TSubject>>;
   setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
   setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
-  attachStatemachineObserver(observer: Observer): void;
-  detachStatemachineObserver(observer: Observer): void;
-  getStatemachineObservers(): Iterable<Observer>;
+  attachStatemachineObserver(
+    observer:
+      | AfterTransitionObserver<TSubject>
+      | BeforeTransitionObserver<TSubject>,
+  ): void;
+  detachStatemachineObserver(
+    observer:
+      | AfterTransitionObserver<TSubject>
+      | BeforeTransitionObserver<TSubject>,
+  ): void;
+  getStatemachineObservers(): Iterable<
+    AfterTransitionObserver<TSubject> | BeforeTransitionObserver<TSubject>
+  >;
 }
 ```
 

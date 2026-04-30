@@ -1,105 +1,138 @@
 # Core
 
-The core module contains the fundamental building blocks of the state machine: states, transitions, events, processes, the state machine itself, the event dispatcher, and state collections.
+The core module contains the fundamental building blocks of the state machine: states, transitions, events, processes, and the state machine itself. In v3, graph construction is routed through `ProcessBuilder`, which produces frozen `Process`/`State`/`Transition` instances.
 
 ## Table of Contents
 
+- [ProcessBuilder](#processbuilder)
 - [State](#state)
 - [Transition](#transition)
 - [Event](#event)
 - [Process](#process)
 - [Statemachine](#statemachine)
-- [Dispatcher](#dispatcher)
-- [StateCollection](#statecollection)
+
+---
+
+## ProcessBuilder
+
+**Import:** `import { ProcessBuilder } from '@camcima/finita'`
+
+The entry point for defining a workflow graph. Collects states and transitions, validates the graph, and produces a frozen `Process`.
+
+### Constructor
+
+```typescript
+new ProcessBuilder<TSubject = unknown>(processName: string)
+```
+
+| Parameter     | Type     | Description      |
+| ------------- | -------- | ---------------- |
+| `processName` | `string` | The process name |
+
+### Methods
+
+| Method                              | Return Type | Description                                                    |
+| ----------------------------------- | ----------- | -------------------------------------------------------------- |
+| `addState(name, options?)`          | `this`      | Declares a state. Pass `{ initial: true }` for the start state |
+| `addTransition(from, to, options?)` | `this`      | Declares a directed edge between two declared states           |
+| `build(options?)`                   | `Process`   | Validates and freezes the graph. May only be called once.      |
+
+### `addState` options
+
+| Option     | Type                      | Default | Description                              |
+| ---------- | ------------------------- | ------- | ---------------------------------------- |
+| `initial`  | `boolean`                 | `false` | Marks this state as the initial state    |
+| `metadata` | `Record<string, unknown>` | `{}`    | Key-value metadata attached to the state |
+
+### `addTransition` options
+
+| Option      | Type                           | Default | Description                                         |
+| ----------- | ------------------------------ | ------- | --------------------------------------------------- |
+| `event`     | `string`                       | —       | The event name that triggers this transition        |
+| `condition` | `ConditionInterface<TSubject>` | `null`  | Guard condition                                     |
+| `weight`    | `number`                       | `1`     | Priority weight used by `WeightTransition` selector |
+
+### `build` options
+
+| Option          | Type      | Default | Description                                                  |
+| --------------- | --------- | ------- | ------------------------------------------------------------ |
+| `strictOrphans` | `boolean` | `false` | When `true`, unreachable states throw `GraphValidationError` |
+
+### Errors thrown
+
+- `ProcessFinalizedError` — `build()` called more than once on the same builder
+- `GraphValidationError` — missing initial state, multiple initial states, unknown transition endpoint, empty event name, orphan state (strict mode)
+- `DuplicateTransitionError` — two transitions with the same `(from, event, to)` identity but conflicting condition objects
+- `DuplicateStateError` — `addState` called with an already-declared name
+
+### Example
+
+```typescript
+import { ProcessBuilder } from "@camcima/finita";
+
+const process = new ProcessBuilder("order-workflow")
+  .addState("draft", { initial: true })
+  .addState("review")
+  .addState("published")
+  .addState("archived")
+  .addTransition("draft", "review", { event: "submit" })
+  .addTransition("review", "published", { event: "approve" })
+  .addTransition("review", "draft", { event: "reject" })
+  .addTransition("published", "archived", { event: "archive" })
+  .build();
+```
 
 ---
 
 ## State
 
-**Import:** `import { State } from '@camcima/finita'`
+**Import:** `import type { StateInterface } from '@camcima/finita'`
 
-A state represents a named node in the workflow graph. Each state can hold outgoing transitions, named events, and arbitrary metadata.
-
-### Constructor
-
-```typescript
-new State(name: string)
-```
-
-| Parameter | Type     | Description                                         |
-| --------- | -------- | --------------------------------------------------- |
-| `name`    | `string` | Unique name identifying this state within a process |
+A state represents a named node in the workflow graph. In v3, states are constructed exclusively by `ProcessBuilder` and are frozen after creation. You interact with states through `StateInterface`.
 
 ### Methods
 
-| Method                         | Return Type                     | Description                                                                                                              |
-| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `getName()`                    | `string`                        | Returns the state name                                                                                                   |
-| `addTransition(transition)`    | `void`                          | Adds an outgoing transition. If the transition has an event name, the corresponding event is auto-created on this state. |
-| `getTransitions()`             | `Iterable<TransitionInterface>` | Returns all outgoing transitions                                                                                         |
-| `hasEvent(name)`               | `boolean`                       | Checks if an event exists on this state                                                                                  |
-| `getEvent(name)`               | `EventInterface`                | Returns the event with the given name. If it doesn't exist, it is **created on demand**.                                 |
-| `getEventNames()`              | `string[]`                      | Returns the names of all events on this state                                                                            |
-| `getMetadata()`                | `Record<string, unknown>`       | Returns all metadata as a plain object                                                                                   |
-| `getMetadataValue(key)`        | `unknown`                       | Returns the value for a metadata key                                                                                     |
-| `setMetadataValue(key, value)` | `void`                          | Sets a metadata key-value pair                                                                                           |
-| `hasMetadataValue(key)`        | `boolean`                       | Checks if a metadata key exists                                                                                          |
-| `deleteMetadataValue(key)`     | `void`                          | Removes a metadata key                                                                                                   |
+| Method                  | Return Type                     | Description                             |
+| ----------------------- | ------------------------------- | --------------------------------------- |
+| `getName()`             | `string`                        | Returns the state name                  |
+| `getTransitions()`      | `Iterable<TransitionInterface>` | Returns all outgoing transitions        |
+| `hasEvent(name)`        | `boolean`                       | Checks if an event exists on this state |
+| `getEvent(name)`        | `EventInterface`                | Returns the event with the given name   |
+| `getEventNames()`       | `string[]`                      | Returns the names of all events         |
+| `getMetadata()`         | `Record<string, unknown>`       | Returns all metadata as a plain object  |
+| `getMetadataValue(key)` | `unknown`                       | Returns the value for a metadata key    |
+| `hasMetadataValue(key)` | `boolean`                       | Checks if a metadata key exists         |
+
+### Key Behaviors
+
+- **Frozen after construction:** State objects are immutable. `addTransition`, `setMetadataValue`, and `deleteMetadataValue` no longer exist; use the builder to declare these at construction time.
+- **Events:** Events on a state correspond to the event names of transitions that leave from that state. They are pre-baked by the builder.
 
 ### Example
 
 ```typescript
-import { State, Transition } from "@camcima/finita";
+import { ProcessBuilder } from "@camcima/finita";
 
-const open = new State("open");
-const closed = new State("closed");
+const process = new ProcessBuilder("example")
+  .addState("open", { initial: true, metadata: { color: "green" } })
+  .addState("closed")
+  .addTransition("open", "closed", { event: "close" })
+  .addTransition("closed", "open", { event: "open" })
+  .build();
 
-// Add transitions
-open.addTransition(new Transition(closed, "close"));
-closed.addTransition(new Transition(open, "open"));
-
-// Events are auto-created when adding transitions with event names
-console.log(open.hasEvent("close")); // true
-console.log(open.getEventNames()); // ['close']
-
-// Metadata
-open.setMetadataValue("color", "green");
-console.log(open.getMetadataValue("color")); // 'green'
-
-// Events are created on demand
-const event = open.getEvent("myEvent");
-console.log(open.hasEvent("myEvent")); // true
+const openState = process.getState("open");
+console.log(openState.hasEvent("close")); // true
+console.log(openState.getEventNames()); // ['close']
+console.log(openState.getMetadataValue("color")); // 'green'
 ```
-
-### Key Behaviors
-
-- **Auto-created events:** When you call `addTransition()` with a transition that has an event name, the state automatically creates the corresponding `Event` object if it doesn't already exist.
-- **On-demand events:** `getEvent()` creates the event if it doesn't exist, making it safe to call at any time.
-- **Automatic transitions:** Transitions with no event name (`null`) do not create events. They are used for condition-based automatic transitions.
 
 ---
 
 ## Transition
 
-**Import:** `import { Transition } from '@camcima/finita'`
+**Import:** `import type { TransitionInterface } from '@camcima/finita'`
 
-A transition represents a directed edge from one state to another. It can optionally be associated with an event name and a condition (guard).
-
-### Constructor
-
-```typescript
-new Transition<TSubject = unknown>(
-  targetState: StateInterface,
-  eventName?: string | null,
-  condition?: ConditionInterface<TSubject> | null
-)
-```
-
-| Parameter     | Type                                   | Default    | Description                                                                       |
-| ------------- | -------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
-| `targetState` | `StateInterface`                       | (required) | The state to transition to                                                        |
-| `eventName`   | `string \| null`                       | `null`     | The event that triggers this transition. `null` makes it an automatic transition. |
-| `condition`   | `ConditionInterface<TSubject> \| null` | `null`     | A guard condition that must be `true` for the transition to be active             |
+A transition represents a directed edge from one state to another. In v3, transitions are constructed exclusively by `ProcessBuilder` and are frozen.
 
 ### Methods
 
@@ -110,8 +143,7 @@ new Transition<TSubject = unknown>(
 | `getConditionName()`                 | `string \| null`                       | Returns the condition name, or `null` if no condition       |
 | `getCondition()`                     | `ConditionInterface<TSubject> \| null` | Returns the condition object                                |
 | `isActive(subject, context, event?)` | `Promise<boolean>`                     | Determines if this transition is currently active           |
-| `getWeight()`                        | `number`                               | Returns the weight (default: `1`)                           |
-| `setWeight(weight)`                  | `void`                                 | Sets the weight                                             |
+| `getWeight()`                        | `number`                               | Returns the weight                                          |
 
 ### How `isActive()` Works
 
@@ -127,18 +159,29 @@ A transition is active when **both** of these are true:
 Triggered explicitly by calling `statemachine.triggerEvent()`.
 
 ```typescript
-const transition = new Transition(targetState, "approve");
+const process = new ProcessBuilder("example")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", { event: "approve" })
+  .build();
 ```
 
 #### Automatic Transition
 
-Has no event name. Fires automatically when its condition is true, checked by `statemachine.checkTransitions()` or as part of the recursive transition-checking after any state change.
+Has no event name. Fires automatically when its condition is true, checked by `statemachine.checkTransitions()`.
 
 ```typescript
-const condition = new CallbackCondition("isExpired", (subject) =>
+import { CallbackCondition, ProcessBuilder } from "@camcima/finita";
+
+const isExpired = new CallbackCondition("isExpired", (subject) =>
   subject.isExpired(),
 );
-const transition = new Transition(targetState, null, condition);
+
+const process = new ProcessBuilder("subscription")
+  .addState("active", { initial: true })
+  .addState("expired")
+  .addTransition("active", "expired", { condition: isExpired })
+  .build();
 ```
 
 #### Conditional Event Transition
@@ -146,20 +189,43 @@ const transition = new Transition(targetState, null, condition);
 Triggered by an event, but only if the condition is also true.
 
 ```typescript
-const condition = new CallbackCondition(
+import { CallbackCondition, ProcessBuilder } from "@camcima/finita";
+
+const canApprove = new CallbackCondition(
   "hasPermission",
   (subject) => subject.canApprove,
 );
-const transition = new Transition(approved, "approve", condition);
+
+const process = new ProcessBuilder("review")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", {
+    event: "approve",
+    condition: canApprove,
+  })
+  .build();
 ```
 
 ### Weight
 
-Transitions have a weight (default: `1`) used by the `WeightTransition` selector to resolve ambiguity when multiple transitions are active.
+Transitions have a weight (default: `1`) used by the `WeightTransition` selector. Set it via `addTransition({ weight })`:
 
 ```typescript
-const urgentTransition = new Transition(targetState, "process");
-urgentTransition.setWeight(10);
+const process = new ProcessBuilder("example")
+  .addState("pending", { initial: true })
+  .addState("vip-approved")
+  .addState("standard-approved")
+  .addTransition("pending", "vip-approved", {
+    event: "approve",
+    condition: isVip,
+    weight: 10,
+  })
+  .addTransition("pending", "standard-approved", {
+    event: "approve",
+    condition: isNotVip,
+    weight: 1,
+  })
+  .build();
 ```
 
 ---
@@ -205,89 +271,63 @@ When `invoke()` is called:
 ### Example
 
 ```typescript
-import { Event, CallbackObserver } from "@camcima/finita";
+import { ProcessBuilder, CallbackObserver } from "@camcima/finita";
 
-const event = new Event("userRegistered");
+const process = new ProcessBuilder("article")
+  .addState("draft", { initial: true })
+  .addState("published")
+  .addTransition("draft", "published", { event: "publish" })
+  .build();
 
-// Attach observers
-event.attach(
-  new CallbackObserver((subject, context) => {
-    console.log("Send welcome email to", subject.email);
-  }),
-);
-
-event.attach(
-  new CallbackObserver((subject, context) => {
-    console.log("Log registration for", subject.email);
-  }),
-);
-
-// When the statemachine invokes this event, both observers fire
-// Arguments are: (subject, context) -- passed by the statemachine
+// Attach an observer to the 'publish' event on the 'draft' state
+process
+  .getState("draft")
+  .getEvent("publish")
+  .attach(
+    new CallbackObserver((subject, context) => {
+      console.log("Send welcome email to", subject.email);
+    }),
+  );
 ```
 
 ---
 
 ## Process
 
-**Import:** `import { Process } from '@camcima/finita'`
+**Import:** `import type { ProcessInterface } from '@camcima/finita'`
 
-A process defines a complete workflow as a named collection of states. It auto-discovers all reachable states by walking the transition graph from the initial state.
-
-### Constructor
-
-```typescript
-new Process(name: string, initialState: StateInterface)
-```
-
-| Parameter      | Type             | Description                          |
-| -------------- | ---------------- | ------------------------------------ |
-| `name`         | `string`         | The process name                     |
-| `initialState` | `StateInterface` | The starting state for this workflow |
+A process defines a complete workflow as a named, frozen collection of states. In v3, processes are created exclusively by `ProcessBuilder.build()`.
 
 ### Methods
 
-| Method              | Return Type                | Description                   |
-| ------------------- | -------------------------- | ----------------------------- |
-| `getName()`         | `string`                   | Returns the process name      |
-| `getInitialState()` | `StateInterface`           | Returns the initial state     |
-| `getStates()`       | `Iterable<StateInterface>` | Returns all discovered states |
-| `getState(name)`    | `StateInterface`           | Returns a state by name       |
-| `hasState(name)`    | `boolean`                  | Checks if a state exists      |
+| Method              | Return Type                | Description               |
+| ------------------- | -------------------------- | ------------------------- |
+| `getName()`         | `string`                   | Returns the process name  |
+| `getInitialState()` | `StateInterface`           | Returns the initial state |
+| `getStates()`       | `Iterable<StateInterface>` | Returns all states        |
+| `getState(name)`    | `StateInterface`           | Returns a state by name   |
+| `hasState(name)`    | `boolean`                  | Checks if a state exists  |
 
 ### Immutability
 
-A `Process` is **immutable after construction**. There are no methods to add or remove states after creation. To build a state graph incrementally, use `StateCollection` with `SetupHelper`, then pass the initial state to the `Process` constructor.
+A `Process` is **immutable after construction**. All states and transitions are frozen by the builder.
 
-### Auto-Discovery
-
-The constructor recursively walks all transitions from the initial state and registers every reachable state. This means you only need to define states and transitions -- the process discovers the complete graph automatically.
+### Example
 
 ```typescript
-const s1 = new State("s1");
-const s2 = new State("s2");
-const s3 = new State("s3");
+import { ProcessBuilder } from "@camcima/finita";
 
-s1.addTransition(new Transition(s2, "next"));
-s2.addTransition(new Transition(s3, "next"));
-
-const process = new Process("workflow", s1);
+const process = new ProcessBuilder("workflow")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  .addState("s3")
+  .addTransition("s1", "s2", { event: "next" })
+  .addTransition("s2", "s3", { event: "next" })
+  .build();
 
 console.log(process.hasState("s1")); // true
-console.log(process.hasState("s2")); // true -- auto-discovered
-console.log(process.hasState("s3")); // true -- auto-discovered
-```
-
-### Duplicate Detection
-
-If two different `State` instances have the same name, the constructor throws an error:
-
-```typescript
-const s1 = new State("shared");
-const s2 = new State("shared"); // Different instance, same name!
-
-s1.addTransition(new Transition(s2, "go"));
-new Process("test", s1); // Error: There is already a different state with name "shared"
+console.log(process.hasState("s2")); // true
+console.log(process.hasState("s3")); // true
 ```
 
 ---
@@ -304,42 +344,42 @@ The state machine is the runtime orchestrator. It tracks the current state, proc
 new Statemachine<TSubject = unknown>(
   subject: TSubject,
   process: ProcessInterface,
-  stateName?: string | null,
-  transitionSelector?: TransitionSelectorInterface<TSubject> | null,
-  mutex?: MutexInterface | null
+  options?: StatemachineOptions<TSubject>
 )
 ```
 
-| Parameter            | Type                                            | Default    | Description                                                                               |
-| -------------------- | ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `subject`            | `TSubject`                                      | (required) | The domain object being managed (e.g., an Order, Article, etc.)                           |
-| `process`            | `ProcessInterface`                              | (required) | The process defining the workflow                                                         |
-| `stateName`          | `string \| null`                                | `null`     | Optional initial state name. If `null`, uses `process.getInitialState()`.                 |
-| `transitionSelector` | `TransitionSelectorInterface<TSubject> \| null` | `null`     | Strategy for selecting among active transitions. Defaults to `OneOrNoneActiveTransition`. |
-| `mutex`              | `MutexInterface \| null`                        | `null`     | Mutex for concurrency control. Defaults to `NullMutex`.                                   |
+| Parameter | Type                            | Description                                                     |
+| --------- | ------------------------------- | --------------------------------------------------------------- |
+| `subject` | `TSubject`                      | The domain object being managed (e.g., an Order, Article, etc.) |
+| `process` | `ProcessInterface`              | The process defining the workflow                               |
+| `options` | `StatemachineOptions<TSubject>` | Optional configuration object (see below)                       |
+
+### `StatemachineOptions`
+
+| Option               | Type                                    | Default                               | Description                                                  |
+| -------------------- | --------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| `initialStateName`   | `string`                                | `process.getInitialState().getName()` | Override the starting state                                  |
+| `transitionSelector` | `TransitionSelectorInterface<TSubject>` | `new OneOrNoneActiveTransition()`     | Strategy for selecting among active transitions              |
+| `mutex`              | `MutexInterface`                        | `new NullMutex()`                     | Mutex for concurrency control                                |
+| `autoreleaseLock`    | `boolean`                               | `true`                                | When `true`, lock is released after each top-level operation |
 
 ### Methods
 
-| Method                                      | Return Type                             | Description                                                              |
-| ------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------ |
-| `getCurrentState()`                         | `StateInterface`                        | Returns the current state                                                |
-| `getLastState()`                            | `StateInterface \| null`                | Returns the previous state (only available during observer notification) |
-| `getSubject()`                              | `TSubject`                              | Returns the managed subject                                              |
-| `getProcess()`                              | `ProcessInterface`                      | Returns the process                                                      |
-| `getSelectedTransition()`                   | `TransitionInterface<TSubject> \| null` | Returns the transition being executed (only during notification)         |
-| `getCurrentContext()`                       | `Map<string, unknown> \| null`          | Returns the current context (only during event processing)               |
-| `triggerEvent(name, context?)`              | `Promise<void>`                         | Triggers a named event on the current state                              |
-| `checkTransitions(context?)`                | `Promise<void>`                         | Evaluates automatic transitions                                          |
-| `dispatchEvent(dispatcher, name, context?)` | `Promise<void>`                         | Advanced: dispatches an event through a custom dispatcher                |
-| `acquireLock()`                             | `Promise<boolean>`                      | Manually acquires the lock                                               |
-| `releaseLock()`                             | `Promise<void>`                         | Manually releases the lock                                               |
-| `isLockAcquired()`                          | `boolean`                               | Checks if the lock is currently acquired                                 |
-| `isAutoreleaseLock()`                       | `boolean`                               | Checks if auto-release is enabled                                        |
-| `setAutoreleaseLock(autorelease)`           | `void`                                  | Enables/disables auto-release of the lock after event processing         |
-| `attach(observer)`                          | `void`                                  | Attaches a state machine observer                                        |
-| `detach(observer)`                          | `void`                                  | Detaches a state machine observer                                        |
-| `notify()`                                  | `Promise<void>`                         | Notifies all attached observers                                          |
-| `getObservers()`                            | `Iterable<Observer>`                    | Returns all attached observers                                           |
+| Method                         | Return Type              | Description                                         |
+| ------------------------------ | ------------------------ | --------------------------------------------------- |
+| `getCurrentState()`            | `StateInterface`         | Returns the current state                           |
+| `getLastState()`               | `StateInterface \| null` | Returns the state before the most recent transition |
+| `getSubject()`                 | `TSubject`               | Returns the managed subject                         |
+| `getProcess()`                 | `ProcessInterface`       | Returns the process                                 |
+| `triggerEvent(name, context?)` | `Promise<void>`          | Triggers a named event on the current state         |
+| `checkTransitions(context?)`   | `Promise<void>`          | Evaluates automatic transitions                     |
+| `acquireLock()`                | `Promise<boolean>`       | Manually acquires the lock                          |
+| `releaseLock()`                | `Promise<void>`          | Manually releases the lock                          |
+| `isLockAcquired()`             | `boolean`                | Checks if the lock is currently acquired            |
+| `isAutoreleaseLock()`          | `boolean`                | Checks if auto-release is enabled                   |
+| `setAutoreleaseLock(value)`    | `void`                   | Enables/disables auto-release                       |
+| `attachBefore(observer)`       | `void`                   | Attaches a `BeforeTransitionObserver`               |
+| `attachAfter(observer)`        | `void`                   | Attaches an `AfterTransitionObserver`               |
 
 ### Event Processing Flow
 
@@ -347,94 +387,83 @@ When `triggerEvent(name, context?)` is called:
 
 ```mermaid
 flowchart TD
-    A[triggerEvent] --> B[Create Dispatcher]
-    B --> C{Event exists on\ncurrent state?}
-    C -- No --> D[Throw WrongEventForStateError]
-    C -- Yes --> E[Acquire lock]
-    E --> F{Lock acquired?}
-    F -- No --> G[Throw LockCanNotBeAcquiredError]
-    F -- Yes --> H[Dispatch event through Dispatcher]
-    H --> I[dispatcher.invoke — notify event observers]
-    I --> J[doCheckTransitions]
-    J --> K[Filter active transitions]
-    K --> L[Select transition via selector]
-    L --> M{State changed?}
-    M -- No --> Q
-    M -- Yes --> N[Update current state]
-    N --> O[Notify state machine observers]
-    O --> P[Recurse: check automatic transitions]
-    P --> J
-    Q[Auto-release lock] --> R[Done]
+    A[triggerEvent] --> B{Concurrent call?}
+    B -- Yes --> C[Queue operation — run after current op]
+    B -- No --> D{Event exists on\ncurrent state?}
+    D -- No --> E[Throw WrongEventForStateError]
+    D -- Yes --> F[Acquire lock]
+    F --> G{Lock acquired?}
+    G -- No --> H[Throw LockCanNotBeAcquiredError]
+    G -- Yes --> I[Notify before-observers\nProposedTransitionFrame]
+    I --> J{Before-observer threw?}
+    J -- Yes --> K[Abort — reject caller]
+    J -- No --> L[Apply transition\nUpdate currentState]
+    L --> M[Notify after-observers\nTransitionFrame]
+    M --> N[Recurse: check automatic transitions]
+    N --> O[Release lock]
+    O --> P[Drain queued operations]
 ```
 
-1. A `Dispatcher` is created
-2. `dispatchEvent()` validates the event exists on the current state
+1. If a concurrent call arrives it is queued and runs after the current top-level operation completes
+2. `triggerEvent()` validates the event exists on the current state
 3. The lock is acquired (throws `LockCanNotBeAcquiredError` if it fails)
-4. The event is dispatched (queued) through the dispatcher
-5. `dispatcher.invoke()` fires the event, which notifies all event observers with `(subject, context)` as arguments
-6. After the dispatcher is ready, `doCheckTransitions()` is called to process the actual state change
-7. If the transition leads to a different state, the state changes and state machine observers are notified
-8. `doCheckTransitions()` recurses to handle any automatic transitions from the new state
-9. The lock is auto-released (if `autoreleaseLock` is `true`)
+4. Before-observers receive a `ProposedTransitionFrame`; throwing aborts the transition
+5. The state changes and after-observers receive a frozen `TransitionFrame`
+6. Automatic transitions are checked recursively from the new state
+7. The lock is auto-released (if `autoreleaseLock` is `true`)
 
-### Automatic Transitions
+### Observers
 
-After any state change, the state machine recursively checks for automatic transitions (transitions without event names). If an automatic transition's condition is `true`, the state machine moves to the target state and recurses again.
+State machine observers are attached via `attachBefore` and `attachAfter`:
 
-> **Note:** Automatic self-transitions (where the target state is the current state) are not allowed and will throw an error, since they would cause infinite recursion. Use event-based self-transitions instead if you need a self-loop.
+- **`BeforeTransitionObserver`** — runs before a transition commits; throwing vetoes the transition
+- **`AfterTransitionObserver`** — runs after a transition commits; receives a frozen `TransitionFrame` plus an `EnqueueContext` for safely chaining events
 
 ```typescript
-const active = new State("active");
-const expired = new State("expired");
+import type {
+  AfterTransitionObserver,
+  TransitionFrame,
+  EnqueueContext,
+} from "@camcima/finita";
 
-// Automatic transition: fires when condition is true, no event needed
-const isExpired = new CallbackCondition("isExpired", (subject) => {
-  return Date.now() > subject.expiresAt;
-});
-active.addTransition(new Transition(expired, null, isExpired));
+class AuditObserver implements AfterTransitionObserver {
+  notify(frame: TransitionFrame, ctx: EnqueueContext): void {
+    console.log(`${frame.fromState.getName()} → ${frame.toState.getName()}`);
+  }
+}
 
-const process = new Process("subscription", active);
-const sm = new Statemachine(subscription, process);
-
-// Check automatic transitions manually
-await sm.checkTransitions();
+const sm = new Statemachine(subject, process);
+sm.attachAfter(new AuditObserver());
 ```
 
-### Observer Notification
+### Concurrency
 
-State machine observers are notified on every **state change** (not on self-transitions). During notification, observers can access:
-
-- `statemachine.getCurrentState()` -- the new state
-- `statemachine.getLastState()` -- the previous state
-- `statemachine.getSelectedTransition()` -- the transition that was taken
-- `statemachine.getSubject()` -- the managed subject
-- `statemachine.getCurrentContext()` -- the event context
+Concurrent calls to `triggerEvent` and `checkTransitions` on the same instance are automatically serialized into a FIFO queue. There is no longer any "already running" error for same-instance concurrency.
 
 ### Lock Management
 
-By default, the state machine uses a `NullMutex` which always succeeds. For concurrency control, pass a `MutexInterface` implementation.
+By default, the state machine uses a `NullMutex` which always succeeds. For concurrency control across processes, pass a `MutexInterface` implementation via options.
 
 ```typescript
-const sm = new Statemachine(subject, process, null, null, myMutex);
+const sm = new Statemachine(subject, process, { mutex: myMutex });
 
 // Auto-release (default): lock is released after each triggerEvent/checkTransitions
 // Manual lock management:
-sm.setAutoreleaseLock(false);
-await sm.acquireLock();
-await sm.triggerEvent("step1");
-await sm.triggerEvent("step2");
-await sm.releaseLock();
+const sm2 = new Statemachine(subject, process, {
+  mutex: myMutex,
+  autoreleaseLock: false,
+});
+await sm2.acquireLock();
+await sm2.triggerEvent("step1");
+await sm2.triggerEvent("step2");
+await sm2.releaseLock();
 ```
 
 ### Typed Usage
 
-The `Statemachine` class accepts a `TSubject` generic parameter, giving you type-safe access to the subject without casts:
-
 ```typescript
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Statemachine,
   CallbackCondition,
 } from "@camcima/finita";
@@ -445,103 +474,23 @@ interface Order {
   status: string;
 }
 
-const pending = new State("pending");
-const approved = new State("approved");
-
 const canApprove = new CallbackCondition<Order>(
   "canApprove",
   (order) => order.total <= 1000, // order is typed as Order -- no cast needed
 );
-pending.addTransition(new Transition(approved, "review", canApprove));
 
-const process = new Process("order", pending);
+const process = new ProcessBuilder<Order>("order")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", {
+    event: "review",
+    condition: canApprove,
+  })
+  .build();
+
 const order: Order = { id: 1, total: 500, status: "pending" };
 const sm = new Statemachine<Order>(order, process);
 
 const subject = sm.getSubject(); // typed as Order
 console.log(subject.total); // 500 -- no cast needed
-```
-
-All generics default to `unknown`, so existing untyped code continues to work unchanged.
-
-> **Limitation:** The `TSubject` generic lives on `Statemachine`, `Transition`, `CallbackCondition`, `Factory`, and related classes — but **not** on `State` or `Process`. This means TypeScript cannot prevent mixing transitions with different subject types in the same state graph. For example, adding both a `Transition<Order>` and a `Transition<User>` to the same `State` compiles without error. Parameterizing `State` and `Process` would require every `new State<Order>("name")` to carry the generic, significantly degrading construction ergonomics for marginal safety gain. In practice, each process graph serves a single subject type, and mismatches surface immediately at runtime.
-
----
-
-## Dispatcher
-
-**Import:** `import { Dispatcher } from '@camcima/finita'`
-
-The dispatcher queues events and their arguments for deferred invocation. It is used internally by the state machine to separate event dispatching from event execution.
-
-### Constructor
-
-```typescript
-new Dispatcher();
-```
-
-### Methods
-
-| Method                                     | Return Type     | Description                                                                         |
-| ------------------------------------------ | --------------- | ----------------------------------------------------------------------------------- |
-| `dispatch(event, args?, onReadyCallback?)` | `void`          | Queues an event with arguments. Throws if already invoked.                          |
-| `invoke()`                                 | `Promise<void>` | Fires all queued events, then calls `onReady` callbacks. Throws if already invoked. |
-| `isReady()`                                | `boolean`       | Returns `true` after `invoke()` has been called                                     |
-
-### Example
-
-```typescript
-import { Dispatcher, Event, CallbackObserver } from "@camcima/finita";
-
-const event = new Event("test");
-event.attach(new CallbackObserver((...args) => console.log("fired:", args)));
-
-const dispatcher = new Dispatcher();
-dispatcher.dispatch(event, ["arg1", "arg2"]);
-// Event has not fired yet
-
-await dispatcher.invoke();
-// Now fires: "fired: ['arg1', 'arg2']"
-```
-
----
-
-## StateCollection
-
-**Import:** `import { StateCollection } from '@camcima/finita'`
-
-A mutable, named collection of states. Used as a building block for `Process` and `SetupHelper`.
-
-### Constructor
-
-```typescript
-new StateCollection();
-```
-
-### Methods
-
-| Method                       | Return Type                | Description                                                         |
-| ---------------------------- | -------------------------- | ------------------------------------------------------------------- |
-| `getState(name)`             | `StateInterface`           | Returns a state by name. Throws if not found.                       |
-| `getStates()`                | `Iterable<StateInterface>` | Returns all states                                                  |
-| `hasState(name)`             | `boolean`                  | Checks if a state exists by name                                    |
-| `addState(state)`            | `void`                     | Adds a state to the collection                                      |
-| `merge(source)`              | `void`                     | Merges states from another collection using `StateCollectionMerger` |
-| `getStateCollectionMerger()` | `StateCollectionMerger`    | Returns the internal merger instance                                |
-
-### Example
-
-```typescript
-import { StateCollection, State, Transition } from "@camcima/finita";
-
-const collection = new StateCollection();
-collection.addState(new State("open"));
-collection.addState(new State("closed"));
-
-console.log(collection.hasState("open")); // true
-console.log(collection.getState("open").getName()); // 'open'
-
-for (const state of collection.getStates()) {
-  console.log(state.getName());
-}
 ```

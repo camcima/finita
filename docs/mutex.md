@@ -56,7 +56,7 @@ This is the default -- you don't need to specify it:
 ```typescript
 // Both are equivalent:
 const sm = new Statemachine(subject, process);
-const sm = new Statemachine(subject, process, null, null, new NullMutex());
+const sm = new Statemachine(subject, process, { mutex: new NullMutex() });
 ```
 
 ---
@@ -121,7 +121,7 @@ class InMemoryLockAdapter implements LockAdapterInterface {
 
 const adapter = new InMemoryLockAdapter();
 const mutex = new LockAdapterMutex(adapter, `order-${order.id}`);
-const sm = new Statemachine(order, process, null, null, mutex);
+const sm = new Statemachine(order, process, { mutex });
 
 // LockAdapterMutex methods are async:
 const acquired = await mutex.acquireLock();
@@ -286,10 +286,10 @@ sequenceDiagram
 By default, the state machine acquires and releases the lock automatically around each `triggerEvent()` or `checkTransitions()` call. You can disable this for batch operations:
 
 ```typescript
-const sm = new Statemachine(subject, process, null, null, mutex);
-
-// Disable auto-release
-sm.setAutoreleaseLock(false);
+const sm = new Statemachine(subject, process, {
+  mutex,
+  autoreleaseLock: false,
+});
 
 // Manual lock management
 await sm.acquireLock();

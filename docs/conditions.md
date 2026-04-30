@@ -26,15 +26,21 @@ A condition's `getName()` value serves as its **semantic identity**, not just a 
 This means:
 
 ```typescript
+import { ProcessBuilder, CallbackCondition } from "@camcima/finita";
+
 const c1 = new CallbackCondition("isReady", () => checkDatabase());
 const c2 = new CallbackCondition("isReady", () => checkCache());
 
-// These are treated as the same transition — c2 is silently ignored
-state.addTransition(new Transition(target, "go", c1));
-state.addTransition(new Transition(target, "go", c2));
+// These are treated as the same transition — c2 is silently deduplicated
+const process = new ProcessBuilder("example")
+  .addState("source", { initial: true })
+  .addState("target")
+  .addTransition("source", "target", { event: "go", condition: c1 })
+  .addTransition("source", "target", { event: "go", condition: c2 }) // same name → dedup
+  .build();
 ```
 
-**Give each distinct condition a unique name.** If two conditions do different things, they must have different names. The name is how the library distinguishes them during transition deduplication, graph export, and setup helpers.
+**Give each distinct condition a unique name.** If two conditions do different things, they must have different names. The name is how the library distinguishes them during transition deduplication and graph export.
 
 ## Overview
 
@@ -90,14 +96,16 @@ new Tautology(name?: string)
 ### Example
 
 ```typescript
-import { Tautology, Transition, State } from "@camcima/finita";
+import { Tautology, ProcessBuilder } from "@camcima/finita";
 
 const always = new Tautology("always proceed");
-const s1 = new State("s1");
-const s2 = new State("s2");
 
-// Automatic transition that always fires
-s1.addTransition(new Transition(s2, null, always));
+const process = new ProcessBuilder("example")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  // Automatic transition that always fires
+  .addTransition("s1", "s2", { condition: always })
+  .build();
 ```
 
 ---
@@ -121,14 +129,16 @@ new Contradiction(name?: string)
 ### Example
 
 ```typescript
-import { Contradiction, Transition, State } from "@camcima/finita";
+import { Contradiction, ProcessBuilder } from "@camcima/finita";
 
 const never = new Contradiction("blocked");
-const s1 = new State("s1");
-const s2 = new State("s2");
 
-// This transition can never fire
-s1.addTransition(new Transition(s2, "go", never));
+const process = new ProcessBuilder("example")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  // This transition can never fire
+  .addTransition("s1", "s2", { event: "go", condition: never })
+  .build();
 ```
 
 ---
@@ -175,7 +185,14 @@ const hasPriority = new CallbackCondition(
 );
 
 // Use in transitions
-pending.addTransition(new Transition(approved, "submit", isApproved));
+const process = new ProcessBuilder("example")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", {
+    event: "submit",
+    condition: isApproved,
+  })
+  .build();
 ```
 
 ### Type: `ConditionCallbackFn`
@@ -339,7 +356,7 @@ new Not<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 ### Example
 
 ```typescript
-import { Not, CallbackCondition, Transition, State } from "@camcima/finita";
+import { Not, CallbackCondition, ProcessBuilder } from "@camcima/finita";
 
 const isExpired = new CallbackCondition("isExpired", (s) => (s as any).expired);
 const isNotExpired = new Not(isExpired);
@@ -347,7 +364,14 @@ const isNotExpired = new Not(isExpired);
 console.log(isNotExpired.getName()); // 'not ( isExpired )'
 
 // Use for conditional transitions
-active.addTransition(new Transition(renewed, "renew", isNotExpired));
+const process = new ProcessBuilder("example")
+  .addState("active", { initial: true })
+  .addState("renewed")
+  .addTransition("active", "renewed", {
+    event: "renew",
+    condition: isNotExpired,
+  })
+  .build();
 ```
 
 ---
@@ -384,7 +408,14 @@ class MinimumBalance implements ConditionInterface<Account> {
 
 // Usage
 const canWithdraw = new MinimumBalance(100);
-active.addTransition(new Transition(withdrawn, "withdraw", canWithdraw));
+const process = new ProcessBuilder("account")
+  .addState("active", { initial: true })
+  .addState("withdrawn")
+  .addTransition("active", "withdrawn", {
+    event: "withdraw",
+    condition: canWithdraw,
+  })
+  .build();
 ```
 
 ### Composing Conditions

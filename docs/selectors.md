@@ -51,7 +51,13 @@ new OneOrNoneActiveTransition();
 ### Example
 
 ```typescript
-import { Statemachine, Process, State, Transition } from "@camcima/finita";
+import { ProcessBuilder, Statemachine } from "@camcima/finita";
+
+const process = new ProcessBuilder("example")
+  .addState("initial", { initial: true })
+  .addState("done")
+  .addTransition("initial", "done", { event: "finish" })
+  .build();
 
 // Default -- uses OneOrNoneActiveTransition
 const sm = new Statemachine(subject, process);
@@ -103,25 +109,25 @@ new ScoreTransition(innerSelector?: TransitionSelectorInterface)
 
 ```typescript
 import {
+  ProcessBuilder,
   ScoreTransition,
   Statemachine,
-  Process,
-  State,
-  Transition,
   Tautology,
 } from "@camcima/finita";
 
-const active = new State("active");
-const expired = new State("expired");
-const renewed = new State("renewed");
+const process = new ProcessBuilder("sub")
+  .addState("active", { initial: true })
+  .addState("expired")
+  .addState("renewed")
+  // Automatic transition (score 1): condition only
+  .addTransition("active", "expired", { condition: new Tautology("isExpired") })
+  // Event transition (score 2): event only
+  .addTransition("active", "renewed", { event: "renew" })
+  .build();
 
-// Automatic transition (score 1): condition only
-active.addTransition(new Transition(expired, null, new Tautology("isExpired")));
-// Event transition (score 2): event only
-active.addTransition(new Transition(renewed, "renew"));
-
-const process = new Process("sub", active);
-const sm = new Statemachine(subject, process, null, new ScoreTransition());
+const sm = new Statemachine(subject, process, {
+  transitionSelector: new ScoreTransition(),
+});
 
 // When 'renew' is triggered, the event-based transition (score 2) wins
 // over the automatic transition (score 1)
@@ -161,34 +167,34 @@ new WeightTransition(innerSelector?: TransitionSelectorInterface, epsilon?: numb
 
 ```typescript
 import {
+  ProcessBuilder,
   WeightTransition,
   Statemachine,
-  State,
-  Transition,
   CallbackCondition,
 } from "@camcima/finita";
-
-const pending = new State("pending");
-const vipApproved = new State("vip-approved");
-const standardApproved = new State("standard-approved");
 
 const isVip = new CallbackCondition("isVip", (s) => (s as any).vip);
 const isNotVip = new CallbackCondition("isNotVip", (s) => !(s as any).vip);
 
-const vipTransition = new Transition(vipApproved, "approve", isVip);
-vipTransition.setWeight(10); // Higher priority
+const process = new ProcessBuilder("approval")
+  .addState("pending", { initial: true })
+  .addState("vip-approved")
+  .addState("standard-approved")
+  .addTransition("pending", "vip-approved", {
+    event: "approve",
+    condition: isVip,
+    weight: 10,
+  })
+  .addTransition("pending", "standard-approved", {
+    event: "approve",
+    condition: isNotVip,
+    weight: 1,
+  })
+  .build();
 
-const standardTransition = new Transition(
-  standardApproved,
-  "approve",
-  isNotVip,
-);
-standardTransition.setWeight(1);
-
-pending.addTransition(vipTransition);
-pending.addTransition(standardTransition);
-
-const sm = new Statemachine(subject, process, null, new WeightTransition());
+const sm = new Statemachine(subject, process, {
+  transitionSelector: new WeightTransition(),
+});
 ```
 
 ---
@@ -210,12 +216,17 @@ flowchart LR
 ```
 
 ```typescript
-import { ScoreTransition, WeightTransition } from "@camcima/finita";
+import {
+  ProcessBuilder,
+  ScoreTransition,
+  Statemachine,
+  WeightTransition,
+} from "@camcima/finita";
 
 // First select by score, then break ties by weight
 const selector = new ScoreTransition(new WeightTransition());
 
-const sm = new Statemachine(subject, process, null, selector);
+const sm = new Statemachine(subject, process, { transitionSelector: selector });
 ```
 
 ---
