@@ -229,6 +229,20 @@ describe("ProcessBuilder", () => {
     expect(a.getEventNames()).toContain("go");
   });
 
+  it("transition target is referentially identical to process.getState() (#3)", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addState("c")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "c", { event: "next" })
+      .build();
+    const tA = Array.from(process.getState("a").getTransitions())[0]!;
+    expect(tA.getTargetState()).toBe(process.getState("b"));
+    const tB = Array.from(process.getState("b").getTransitions())[0]!;
+    expect(tB.getTargetState()).toBe(process.getState("c"));
+  });
+
   it("returned Process is frozen", () => {
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })

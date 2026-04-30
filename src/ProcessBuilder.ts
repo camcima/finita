@@ -110,34 +110,13 @@ export class ProcessBuilder<TSubject = unknown> {
     const initialName = this.findInitialStateName();
     const eventNamesByState = this.collectEventNamesByState();
 
-    // Pass 1: create State instances with no transitions — these serve as
-    // transition targets so that the Transition objects can reference them.
-    const targetStates = new Map<string, StateInterface>();
-    for (const spec of this.stateSpecs.values()) {
-      const state = new State(
-        INTERNAL_CONSTRUCTION_KEY,
-        spec.name,
-        [],
-        eventNamesByState.get(spec.name) ?? [],
-        spec.metadata,
-      );
-      targetStates.set(spec.name, state);
-    }
-
-    // Pass 2: build transitions pointing to pass-1 states, then re-create
-    // each State with its transitions.
-    const transitionsByState = this.buildTransitionsByState(targetStates);
-    const finalStates = new Map<string, StateInterface>();
-    for (const spec of this.stateSpecs.values()) {
-      const state = new State(
-        INTERNAL_CONSTRUCTION_KEY,
-        spec.name,
-        transitionsByState.get(spec.name) ?? [],
-        eventNamesByState.get(spec.name) ?? [],
-        spec.metadata,
-      );
-      finalStates.set(spec.name, state);
-    }
+    // Build states using depth-first construction (leaves first) so that each
+    // Transition.getTargetState() returns the exact State instance that
+    // Process.getState() exposes — referential identity is guaranteed for
+    // acyclic graphs.  Cycles are handled by creating a stub for states that
+    // are already in progress, then rebuilding their transitions in a second
+    // sweep once all states exist (same three-pass logic, scoped to the cycle).
+    const finalStates = this.buildStatesLeafFirst(eventNamesByState);
 
     if (options.strictOrphans) {
       this.validateOrphans(finalStates, initialName);
@@ -255,6 +234,194 @@ export class ProcessBuilder<TSubject = unknown> {
     return new Map(
       Array.from(out.entries()).map(([k, v]) => [k, Array.from(v)]),
     );
+  }
+
+  /**
+   * Builds all State instances using a depth-first, leaf-first traversal so
+   * that every Transition.getTargetState() reference points to the exact same
+   * State object that ends up in the final Process state map.
+   *
+   * For acyclic graphs every target state is fully constructed before the
+   * transition that points to it is created, so identity holds automatically.
+   *
+   * For graphs that contain cycles, the algorithm detects the in-progress
+   * state (cycle member), inserts a placeholder stub, completes the rest of
+   * the DFS, and then rebuilds transitions for the cyclic states in a second
+   * sweep — which is the classic three-pass approach, but limited to states
+   * that are part of an actual cycle.
+   */
+  private buildStatesLeafFirst(
+    eventNamesByState: Map<string, string[]>,
+  ): Map<string, StateInterface> {
+    const built = new Map<string, StateInterface>();
+    const inProgress = new Set<string>(); // cycle detection
+    const dedupSeen = new Set<string>();
+
+    const buildState = (name: string): StateInterface => {
+      if (built.has(name)) return built.get(name)!;
+
+      // Cycle detected: create a stub and return it; the cycle will be
+      // resolved in the second sweep below.
+      if (inProgress.has(name)) {
+        const spec = this.stateSpecs.get(name)!;
+        const stub = new State(
+          INTERNAL_CONSTRUCTION_KEY,
+          spec.name,
+          [],
+          eventNamesByState.get(spec.name) ?? [],
+          spec.metadata,
+        );
+        built.set(name, stub);
+        return stub;
+      }
+
+      inProgress.add(name);
+      const spec = this.stateSpecs.get(name)!;
+
+      // Collect outgoing transition specs for this state, deduped.
+      const mySpecs = this.transitionSpecs.filter((t) => t.fromState === name);
+      const transitions: TransitionInterface<TSubject>[] = [];
+      for (const tSpec of mySpecs) {
+        const conditionName = tSpec.condition
+          ? tSpec.condition.getName()
+          : null;
+        const dedupKey = `${tSpec.fromState}\x00${tSpec.eventName ?? ""}\x00${tSpec.toState}\x00${conditionName ?? ""}`;
+        if (dedupSeen.has(dedupKey)) continue;
+        dedupSeen.add(dedupKey);
+
+        // Build the target state recursively (leaf-first).
+        const targetState = buildState(tSpec.toState);
+        transitions.push(
+          new Transition<TSubject>(
+            INTERNAL_CONSTRUCTION_KEY,
+            targetState,
+            tSpec.eventName,
+            tSpec.condition,
+            tSpec.weight,
+          ),
+        );
+      }
+
+      const state = new State(
+        INTERNAL_CONSTRUCTION_KEY,
+        spec.name,
+        transitions,
+        eventNamesByState.get(spec.name) ?? [],
+        spec.metadata,
+      );
+      built.set(name, state);
+      inProgress.delete(name);
+      return state;
+    };
+
+    // Build all states (the DFS will pull in reachable states recursively;
+    // unreachable/orphan states are handled by iterating all specs).
+    for (const name of this.stateSpecs.keys()) {
+      buildState(name);
+    }
+
+    // Second sweep: fix up any states that were stubs due to cycles.
+    // States involved in cycles had their stubs created early; rebuild their
+    // transitions now that all states exist in `built`.
+    const cycleStates = Array.from(built.keys()).filter((name) => {
+      const s = built.get(name)!;
+      // A stub has no transitions even though the spec has outgoing edges.
+      const hasOutgoing = this.transitionSpecs.some((t) => t.fromState === name);
+      return (
+        hasOutgoing && Array.from(s.getTransitions()).length === 0
+      );
+    });
+
+    if (cycleStates.length > 0) {
+      // Rebuild transitions for cycle-affected states pointing to `built`.
+      for (const name of cycleStates) {
+        const spec = this.stateSpecs.get(name)!;
+        const mySpecs = this.transitionSpecs.filter((t) => t.fromState === name);
+        const transitions: TransitionInterface<TSubject>[] = [];
+        const localSeen = new Set<string>();
+        for (const tSpec of mySpecs) {
+          const conditionName = tSpec.condition
+            ? tSpec.condition.getName()
+            : null;
+          const dedupKey = `${tSpec.fromState}\x00${tSpec.eventName ?? ""}\x00${tSpec.toState}\x00${conditionName ?? ""}`;
+          if (localSeen.has(dedupKey)) continue;
+          localSeen.add(dedupKey);
+          const targetState = built.get(tSpec.toState)!;
+          transitions.push(
+            new Transition<TSubject>(
+              INTERNAL_CONSTRUCTION_KEY,
+              targetState,
+              tSpec.eventName,
+              tSpec.condition,
+              tSpec.weight,
+            ),
+          );
+        }
+        built.set(
+          name,
+          new State(
+            INTERNAL_CONSTRUCTION_KEY,
+            spec.name,
+            transitions,
+            eventNamesByState.get(spec.name) ?? [],
+            spec.metadata,
+          ),
+        );
+      }
+
+      // For cyclic graphs, the non-cycle states that transition INTO cycle
+      // states may still have their transitions pointing at the old stubs.
+      // A final sweep rebuilds those too.
+      const cycleStateSet = new Set(cycleStates);
+      for (const name of built.keys()) {
+        if (cycleStateSet.has(name)) continue;
+        const s = built.get(name)!;
+        let needsRebuild = false;
+        for (const t of s.getTransitions()) {
+          if (cycleStateSet.has(t.getTargetState().getName())) {
+            needsRebuild = true;
+            break;
+          }
+        }
+        if (!needsRebuild) continue;
+
+        const spec = this.stateSpecs.get(name)!;
+        const mySpecs = this.transitionSpecs.filter(
+          (t) => t.fromState === name,
+        );
+        const transitions: TransitionInterface<TSubject>[] = [];
+        const localSeen = new Set<string>();
+        for (const tSpec of mySpecs) {
+          const conditionName = tSpec.condition
+            ? tSpec.condition.getName()
+            : null;
+          const dedupKey = `${tSpec.fromState}\x00${tSpec.eventName ?? ""}\x00${tSpec.toState}\x00${conditionName ?? ""}`;
+          if (localSeen.has(dedupKey)) continue;
+          localSeen.add(dedupKey);
+          transitions.push(
+            new Transition<TSubject>(
+              INTERNAL_CONSTRUCTION_KEY,
+              built.get(tSpec.toState)!,
+              tSpec.eventName,
+              tSpec.condition,
+              tSpec.weight,
+            ),
+          );
+        }
+        built.set(
+          name,
+          new State(
+            INTERNAL_CONSTRUCTION_KEY,
+            spec.name,
+            transitions,
+            eventNamesByState.get(spec.name) ?? [],
+            spec.metadata,
+          ),
+        );
+      }
+    }
+
+    return built;
   }
 
   private buildTransitionsByState(
