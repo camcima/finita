@@ -106,5 +106,9 @@ export {
   DuplicateStateError,
   ProcessFinalizedError,
   GraphValidationError,
+  DuplicateTransitionError,
 } from "./error/index.js";
-export type { GraphValidationCode } from "./error/index.js";
+export type {
+  GraphValidationCode,
+  DuplicateTransitionConflict,
+} from "./error/index.js";

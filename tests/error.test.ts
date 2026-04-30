@@ -5,6 +5,7 @@ import {
   DuplicateStateError,
   ProcessFinalizedError,
   GraphValidationError,
+  DuplicateTransitionError,
   State,
   StateCollection,
 } from "../src/index.js";
@@ -86,5 +87,22 @@ describe("GraphValidationError", () => {
     expect(err.message).toContain("unknownTarget");
     expect(err.message).toContain('"x"');
     expect(err.details).toEqual({ fromState: "a", toState: "x" });
+  });
+});
+
+describe("DuplicateTransitionError", () => {
+  it("captures conflict descriptors", () => {
+    const err = new DuplicateTransitionError({
+      fromState: "draft",
+      toState: "submitted",
+      eventName: "submit",
+      existingConditionName: "hasItems",
+      newConditionName: "isAuthorised",
+    });
+    expect(err.name).toBe("DuplicateTransitionError");
+    expect(err.message).toContain("draft");
+    expect(err.message).toContain("submit");
+    expect(err.message).toContain("hasItems");
+    expect(err.message).toContain("isAuthorised");
   });
 });
