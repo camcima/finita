@@ -23,10 +23,11 @@ import type { QueuedOperation } from "./internal/OperationQueue.js";
 import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
+import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 
-export class Statemachine<TSubject = unknown>
-  implements StatemachineInterface<TSubject>
-{
+export class Statemachine<
+  TSubject = unknown,
+> implements StatemachineInterface<TSubject> {
   private readonly subject: TSubject;
   private readonly process: ProcessInterface;
   private readonly transitionSelector: TransitionSelectorInterface<TSubject>;
@@ -223,9 +224,9 @@ export class Statemachine<TSubject = unknown>
         context,
         event ?? undefined,
       );
-      const selected = this.transitionSelector.selectTransition(active) as
-        | TransitionInterface<TSubject>
-        | null;
+      const selected = this.transitionSelector.selectTransition(
+        active,
+      ) as TransitionInterface<TSubject> | null;
 
       if (!selected) {
         return;
@@ -236,8 +237,9 @@ export class Statemachine<TSubject = unknown>
       if (selected.getEventName() === null) {
         automaticVisited.add(this.currentState);
         if (automaticVisited.has(target)) {
-          throw new Error(
-            `Automatic transition cycle detected: state "${target.getName()}" was already visited — this would cause infinite recursion`,
+          throw new AutomaticTransitionCycleError(
+            target.getName(),
+            Array.from(automaticVisited).map((s) => s.getName()),
           );
         }
       }

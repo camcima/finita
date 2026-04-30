@@ -6,6 +6,7 @@ import {
   ProcessNotFoundError,
   InvalidSubjectError,
   AmbiguousTransitionError,
+  AutomaticTransitionCycleError,
 } from "../src/error/index.js";
 import { ProcessBuilder } from "../src/ProcessBuilder.js";
 
@@ -141,6 +142,31 @@ describe("typed throws", () => {
       expect(e.activeCount).toBe(2);
       // selector.test.ts asserts the message contains "More than one"
       expect(e.message).toContain("More than one");
+    });
+  });
+
+  describe("Statemachine automatic-cycle detection", () => {
+    it("throws AutomaticTransitionCycleError with target and visited names", async () => {
+      const { Statemachine } = await import("../src/Statemachine.js");
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2") // automatic
+        .addTransition("s2", "s1") // automatic
+        .build();
+      const sm = new Statemachine({}, process);
+      let caught: unknown;
+      try {
+        await sm.checkTransitions();
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(AutomaticTransitionCycleError);
+      const e = caught as AutomaticTransitionCycleError;
+      expect(e.code).toBe("automaticTransitionCycle");
+      expect(typeof e.targetStateName).toBe("string");
+      expect(Array.isArray([...e.visitedStateNames])).toBe(true);
+      expect(e.message).toContain("Automatic transition cycle detected");
     });
   });
 });
