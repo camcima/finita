@@ -19,28 +19,43 @@ interface ConditionInterface<TSubject = unknown> extends Named {
 
 The `subject` is the domain object managed by the state machine. The `context` is a `Map<string, unknown>` passed when triggering events or checking transitions.
 
-## Condition Name as Identity
+## Condition Identity for Deduplication
 
-A condition's `getName()` value serves as its **semantic identity**, not just a display label. Two transitions that share the same target state, event name, and condition name are considered duplicates — even if they reference different condition objects with different logic.
+`ProcessBuilder` deduplicates transitions by `(fromState, event, toState, condition reference)`. Two declarations with the same `(fromState, event, toState)` triple and the **same condition object reference** are silently merged — declaring the same transition twice is idempotent. Two declarations sharing the same triple but referring to **different condition objects** throw `DuplicateTransitionError` at build time, regardless of whether the conditions share a `getName()` value.
 
-This means:
+The library cannot introspect a callable's body to compare logic, so different object identity is treated as different logic.
 
 ```typescript
-import { ProcessBuilder, CallbackCondition } from "@camcima/finita";
+import {
+  ProcessBuilder,
+  CallbackCondition,
+  DuplicateTransitionError,
+} from "@camcima/finita";
 
-const c1 = new CallbackCondition("isReady", () => checkDatabase());
-const c2 = new CallbackCondition("isReady", () => checkCache());
+const checkReady = new CallbackCondition("isReady", () => checkDatabase());
 
-// These are treated as the same transition — c2 is silently deduplicated
-const process = new ProcessBuilder("example")
+// Same reference declared twice → silently dedup'd, one transition built.
+new ProcessBuilder("idempotent")
   .addState("source", { initial: true })
   .addState("target")
-  .addTransition("source", "target", { event: "go", condition: c1 })
-  .addTransition("source", "target", { event: "go", condition: c2 }) // same name → dedup
+  .addTransition("source", "target", { event: "go", condition: checkReady })
+  .addTransition("source", "target", { event: "go", condition: checkReady })
   .build();
+
+// Different references with the same name → conflict, throws at build time.
+const a = new CallbackCondition("isReady", () => checkDatabase());
+const b = new CallbackCondition("isReady", () => checkCache());
+expect(() =>
+  new ProcessBuilder("conflicting")
+    .addState("source", { initial: true })
+    .addState("target")
+    .addTransition("source", "target", { event: "go", condition: a })
+    .addTransition("source", "target", { event: "go", condition: b })
+    .build(),
+).toThrow(DuplicateTransitionError);
 ```
 
-**Give each distinct condition a unique name.** If two conditions do different things, they must have different names. The name is how the library distinguishes them during transition deduplication and graph export.
+**Reuse the same condition instance when you mean the same condition.** Construct it once and pass the same reference to every `addTransition` that should share it. The `getName()` value is used for graph labels and error messages, not for deduplication.
 
 ## Overview
 
@@ -155,10 +170,10 @@ Wraps a function as a condition. This is the most common way to create custom gu
 new CallbackCondition<TSubject = unknown>(name: string, callable: ConditionCallbackFn<TSubject>)
 ```
 
-| Parameter  | Type                                                                          | Description                                                              |
-| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `name`     | `string`                                                                      | The condition name (used as identity for deduplication and graph labels) |
-| `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                                       |
+| Parameter  | Type                                                                          | Description                                                   |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `name`     | `string`                                                                      | The condition name (used for graph labels and error messages) |
+| `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                            |
 
 ### Example
 
