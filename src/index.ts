@@ -108,12 +108,19 @@ export type {
 
 // Errors
 export {
+  FinitaError,
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   DuplicateStateError,
   ProcessFinalizedError,
   GraphValidationError,
   DuplicateTransitionError,
+  StateNotFoundError,
+  StateEventNotFoundError,
+  ProcessNotFoundError,
+  InvalidSubjectError,
+  AmbiguousTransitionError,
+  AutomaticTransitionCycleError,
 } from "./error/index.js";
 export type {
   GraphValidationCode,
