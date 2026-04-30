@@ -117,11 +117,14 @@ import {
 
 const process = new ProcessBuilder("sub")
   .addState("active", { initial: true })
-  .addState("expired")
   .addState("renewed")
-  // Automatic transition (score 1): condition only
-  .addTransition("active", "expired", { condition: new Tautology("isExpired") })
-  // Event transition (score 2): event only
+  .addState("upgraded")
+  // Event + condition (score 3): event AND condition required
+  .addTransition("active", "upgraded", {
+    event: "renew",
+    condition: new Tautology("hasUpgradeCredit"),
+  })
+  // Event only (score 2): event-only transition
   .addTransition("active", "renewed", { event: "renew" })
   .build();
 
@@ -129,10 +132,26 @@ const sm = new Statemachine(subject, process, {
   transitionSelector: new ScoreTransition(),
 });
 
-// When 'renew' is triggered, the event-based transition (score 2) wins
-// over the automatic transition (score 1)
+// When 'renew' is triggered, both transitions are active. ScoreTransition
+// prefers the event+condition transition (score 3) over the event-only one
+// (score 2), so the subject moves from "active" to "upgraded".
 sm.triggerEvent("renew");
 ```
+
+### Phase separation: events vs automatic transitions
+
+`ScoreTransition` (and every other selector) only sees transitions that are
+active for the current evaluation phase. v3 has two separate phases:
+
+- **Event phase** — `triggerEvent("foo")` evaluates only transitions whose
+  `event` matches `"foo"`. Automatic transitions (those declared without an
+  `event:` option) are not in the active set.
+- **Automatic phase** — `checkTransitions()` evaluates only transitions
+  whose `event` is `null`. Event-bound transitions are not in the active set.
+
+Mixing the two — e.g., expecting an automatic transition to outrank an event
+transition during a `triggerEvent` call — is not how the runtime resolves
+transitions. Score selectors compare like with like.
 
 ---
 
