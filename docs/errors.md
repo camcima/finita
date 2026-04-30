@@ -232,7 +232,7 @@ try {
 
 **Import:** `import { DuplicateTransitionError } from '@camcima/finita'`
 
-Thrown by `ProcessBuilder.build()` when two `addTransition` calls describe the same `(fromState, event, toState)` triple but reference different condition objects with different names. Same-identity duplicates (same condition name) are silently deduplicated; conflicting duplicates (different condition names, same endpoint triple) are an error.
+Thrown by `ProcessBuilder.build()` when two `addTransition` calls describe the same `(fromState, event, toState)` triple but reference **different condition object instances**, regardless of whether the conditions share a `getName()` value. Declaring the same transition twice with the **same condition reference** is silently deduplicated (idempotent re-declaration); declaring it with two different references is treated as conflicting logic, since the library cannot introspect callable bodies to compare them. See [Condition Identity for Deduplication](conditions.md#condition-identity-for-deduplication) for the rationale.
 
 ### Properties
 
