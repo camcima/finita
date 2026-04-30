@@ -3,6 +3,7 @@ import { StateCollection } from "../src/StateCollection.js";
 import {
   StateNotFoundError,
   StateEventNotFoundError,
+  ProcessNotFoundError,
 } from "../src/error/index.js";
 import { ProcessBuilder } from "../src/ProcessBuilder.js";
 
@@ -60,6 +61,34 @@ describe("typed throws", () => {
       expect(e.code).toBe("stateEventNotFound");
       expect(e.stateName).toBe("a");
       expect(e.eventName).toBe("nope");
+    });
+  });
+
+  describe("AbstractNamedProcessDetector.detectProcess", () => {
+    it("throws ProcessNotFoundError with processName and availableProcesses", async () => {
+      const { AbstractNamedProcessDetector } =
+        await import("../src/factory/AbstractNamedProcessDetector.js");
+      class TestDetector extends AbstractNamedProcessDetector<unknown> {
+        protected detectProcessName(): string {
+          return "missing";
+        }
+      }
+      const proc = new ProcessBuilder("known")
+        .addState("s", { initial: true })
+        .build();
+      const detector = new TestDetector();
+      detector.addProcess(proc);
+      let caught: unknown;
+      try {
+        detector.detectProcess({});
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ProcessNotFoundError);
+      const e = caught as ProcessNotFoundError;
+      expect(e.code).toBe("processNotFound");
+      expect(e.processName).toBe("missing");
+      expect([...e.availableProcesses]).toEqual(["known"]);
     });
   });
 });

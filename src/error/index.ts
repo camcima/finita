@@ -7,5 +7,6 @@ export { GraphValidationError } from "./GraphValidationError.js";
 export { DuplicateTransitionError } from "./DuplicateTransitionError.js";
 export { StateNotFoundError } from "./StateNotFoundError.js";
 export { StateEventNotFoundError } from "./StateEventNotFoundError.js";
+export { ProcessNotFoundError } from "./ProcessNotFoundError.js";
 export type { GraphValidationCode } from "./GraphValidationError.js";
 export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";
