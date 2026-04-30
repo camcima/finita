@@ -1,0 +1,161 @@
+# Migrating from v2 to v3
+
+`@camcima/finita` v3.0.0 is a breaking change release that addresses architectural correctness issues in the execution engine and graph construction. This guide walks each public API change with before/after examples.
+
+The safest verification path is running your existing test suite against v3; many migrations are mechanical and surface as type errors first.
+
+---
+
+## 1. Building a process — `ProcessBuilder` replaces direct construction
+
+**Before (v2):**
+
+```ts
+import { State, Transition, Process } from "@camcima/finita";
+
+const draft = new State("draft");
+const submitted = new State("submitted");
+draft.addTransition(new Transition(submitted, "submit"));
+const process = new Process("orderFulfillment", draft);
+```
+
+**After (v3):**
+
+```ts
+import { ProcessBuilder } from "@camcima/finita";
+
+const process = new ProcessBuilder("orderFulfillment")
+  .addState("draft", { initial: true })
+  .addState("submitted")
+  .addTransition("draft", "submitted", { event: "submit" })
+  .build();
+```
+
+`State`, `Transition`, and `Process` are still exported but their constructors are no longer user-callable. Calling `new State("foo")` from your own code throws at runtime.
+
+The builder validates the graph at `build()` time; missing initial states, unknown transition targets, empty event names, and conflicting duplicate transitions are typed errors (`GraphValidationError`, `DuplicateTransitionError`).
+
+## 2. Statemachine constructor — options object
+
+**Before (v2):**
+
+```ts
+const sm = new Statemachine(
+  subject,
+  process,
+  "draft",
+  new OneOrNoneActiveTransition(),
+  mutex,
+);
+```
+
+**After (v3):**
+
+```ts
+const sm = new Statemachine(subject, process, {
+  initialStateName: "draft",
+  transitionSelector: new OneOrNoneActiveTransition(),
+  mutex,
+});
+```
+
+All options are optional. `autoreleaseLock` defaults to `true`.
+
+## 3. Observers — split into `before` and `after`
+
+**Before (v2):** a single `Observer` interface with `update(subject)` was attached via `sm.attach(observer)`. Implementations pulled fields off the subject.
+
+**After (v3):** two interfaces with distinct contracts.
+
+- `BeforeTransitionObserver` runs against a `ProposedTransitionFrame`; throwing aborts the transition.
+- `AfterTransitionObserver` runs against a frozen `TransitionFrame` after commit; throwing does not roll back state but is reported.
+
+```ts
+import type {
+  BeforeTransitionObserver,
+  AfterTransitionObserver,
+  TransitionFrame,
+  ProposedTransitionFrame,
+  EnqueueContext,
+} from "@camcima/finita";
+
+class Auditor implements AfterTransitionObserver {
+  notify(frame: TransitionFrame, ctx: EnqueueContext): void {
+    console.log(
+      `Transition from ${frame.fromState.getName()} to ${frame.toState.getName()}`,
+    );
+  }
+}
+
+const sm = new Statemachine(subject, process);
+sm.attachAfter(new Auditor());
+```
+
+Migration rule of thumb:
+
+- Logic that **validates or vetoes** transitions → `attachBefore`.
+- Logic that **logs, syncs, or chains** events → `attachAfter`.
+
+## 4. Frames replace mutable observer-context fields
+
+`getSelectedTransition()`, `getCurrentContext()`, and the legacy `currentEvent` getter on `Statemachine` are removed. Read these from the frame parameter inside an observer.
+
+`getLastState()` is retained and now consistent: it always returns the immediate predecessor of `currentState`.
+
+## 5. `OnEnterObserver` runs queued, not nested
+
+`OnEnterObserver` is now an `AfterTransitionObserver`. Its `notify` _enqueues_ the chained event instead of running it inline. Other after-observers registered after `OnEnterObserver` see the original transition's frame, not the chained one.
+
+If your code asserted that a logger registered after `OnEnterObserver` saw the chained transition, those assertions need updating.
+
+## 6. Concurrency — same-instance calls serialize
+
+In v2, calling `triggerEvent` while another `triggerEvent` was in flight on the same `Statemachine` instance threw `"Event dispatching is still running!"`. In v3, the second call is queued and runs after the first completes. Same for `checkTransitions`.
+
+If your code relied on the throw to detect a race condition, replace it with explicit serialization at the application layer (e.g., debounce or mutex).
+
+## 7. Mutex — no `isAcquired()` short-circuit
+
+`Statemachine.acquireLock()` now always delegates to `mutex.acquireLock()`. A mutex implementation whose `isAcquired()` returns `true` but whose `acquireLock()` returns `false` will cause the operation to fail with `LockCanNotBeAcquiredError`. This is the intended contract; v2's short-circuit hid bugs.
+
+## 8. Removed APIs
+
+| Removed                                   | Replacement                                               |
+| ----------------------------------------- | --------------------------------------------------------- |
+| `new State("...")`                        | `ProcessBuilder.addState`                                 |
+| `new Transition(...)`                     | `ProcessBuilder.addTransition`                            |
+| `new Process(...)`                        | `ProcessBuilder.build()`                                  |
+| `state.addTransition(...)`                | `ProcessBuilder.addTransition`                            |
+| `transition.setWeight(...)`               | `ProcessBuilder.addTransition({ weight })`                |
+| `state.setMetadataValue(...)`             | `ProcessBuilder.addState({ metadata })`                   |
+| `sm.attach(observer)`                     | `sm.attachBefore(observer)` or `sm.attachAfter(observer)` |
+| `sm.notify()`, `sm.getObservers()`        | n/a — observer notification is internal                   |
+| `sm.dispatchEvent(dispatcher, name, ...)` | `sm.triggerEvent(name, ...)` (sole entry point)           |
+| `sm.getSelectedTransition()`              | frame parameter inside `AfterTransitionObserver`          |
+| `sm.getCurrentContext()`                  | frame parameter inside observer                           |
+| `Dispatcher`                              | internal — not exported                                   |
+| `StateCollection`                         | internal — not exported                                   |
+| `SetupHelper`                             | use `ProcessBuilder` directly                             |
+| `StateCollectionMerger`                   | use `ProcessBuilder` directly                             |
+
+## 9. New error classes
+
+| Class                      | When                                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------- |
+| `ProcessFinalizedError`    | `ProcessBuilder.build()` called twice                                                         |
+| `GraphValidationError`     | unknown source/target, missing/multiple initial state, empty event name, orphan (strict mode) |
+| `DuplicateTransitionError` | two transitions with the same `(from, event, to)` and conflicting condition objects           |
+
+## 10. After-observer error aggregation
+
+When multiple after-observers throw, the caller's promise rejects with a standard `AggregateError` whose `errors` array contains the thrown errors in invocation order. When exactly one throws, the caller receives that error directly.
+
+## 11. `StatefulStatusChanger` constructor
+
+`StatefulStatusChanger` now takes the subject at construction:
+
+```ts
+sm.attachAfter(new StatefulStatusChanger(subject));
+```
+
+The v2 reflective subject lookup is gone; explicit injection makes the contract typed.
