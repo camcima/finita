@@ -1,18 +1,20 @@
 import { describe, it, expect } from "vitest";
 import {
-  State,
-  Transition,
-  StateCollection,
+  ProcessBuilder,
   GraphBuilder,
   CallbackCondition,
 } from "../src/index.js";
 
 describe("GraphBuilder", () => {
   it("should build graph from states", () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    s2.addTransition(new Transition(s1, "back"));
+    const process = new ProcessBuilder("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .addTransition("s2", "s1", { event: "back" })
+      .build();
+    const s1 = process.getState("s1");
+    const s2 = process.getState("s2");
 
     const builder = new GraphBuilder();
     builder.addState(s1);
@@ -25,10 +27,13 @@ describe("GraphBuilder", () => {
   });
 
   it("should include transition labels", () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
     const cond = new CallbackCondition("isReady", () => true);
-    s1.addTransition(new Transition(s2, "go", cond));
+    const process = new ProcessBuilder("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go", condition: cond })
+      .build();
+    const s1 = process.getState("s1");
 
     const builder = new GraphBuilder();
     builder.addState(s1);
@@ -40,25 +45,29 @@ describe("GraphBuilder", () => {
   });
 
   it("should handle addStateCollection", () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    const collection = new StateCollection();
-    collection.addState(s1);
-    collection.addState(s2);
+    const process = new ProcessBuilder("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
 
     const builder = new GraphBuilder();
-    builder.addStateCollection(collection);
+    // Use addStates with the process's states iterable
+    builder.addStates(Array.from(process.getStates()));
 
     const graph = builder.getGraph();
     expect(graph.nodes).toHaveLength(2);
   });
 
   it("should not duplicate nodes", () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    s2.addTransition(new Transition(s1, "back"));
+    const process = new ProcessBuilder("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .addTransition("s2", "s1", { event: "back" })
+      .build();
+    const s1 = process.getState("s1");
+    const s2 = process.getState("s2");
 
     const builder = new GraphBuilder();
     builder.addStates([s1, s2]);
@@ -69,9 +78,12 @@ describe("GraphBuilder", () => {
 
   describe("toDot", () => {
     it("should produce valid DOT output", () => {
-      const s1 = new State("new");
-      const s2 = new State("shipped");
-      s1.addTransition(new Transition(s2, "ship"));
+      const process = new ProcessBuilder("p")
+        .addState("new", { initial: true })
+        .addState("shipped")
+        .addTransition("new", "shipped", { event: "ship" })
+        .build();
+      const s1 = process.getState("new");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -86,7 +98,11 @@ describe("GraphBuilder", () => {
     });
 
     it("should respect rankdir option", () => {
-      const s1 = new State("a");
+      const process = new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .build();
+      const s1 = process.getState("a");
+
       const builder = new GraphBuilder();
       builder.addState(s1);
 
@@ -95,9 +111,12 @@ describe("GraphBuilder", () => {
     });
 
     it("should escape double quotes in labels", () => {
-      const s1 = new State('state "one"');
-      const s2 = new State('state "two"');
-      s1.addTransition(new Transition(s2, "go"));
+      const process = new ProcessBuilder("p")
+        .addState('state "one"', { initial: true })
+        .addState('state "two"')
+        .addTransition('state "one"', 'state "two"', { event: "go" })
+        .build();
+      const s1 = process.getState('state "one"');
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -108,10 +127,13 @@ describe("GraphBuilder", () => {
     });
 
     it("should include condition and event in edge labels", () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
       const cond = new CallbackCondition("isReady", () => true);
-      s1.addTransition(new Transition(s2, "go", cond));
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go", condition: cond })
+        .build();
+      const s1 = process.getState("s1");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -124,9 +146,12 @@ describe("GraphBuilder", () => {
 
   describe("toMermaid", () => {
     it("should produce valid Mermaid stateDiagram output", () => {
-      const s1 = new State("new");
-      const s2 = new State("shipped");
-      s1.addTransition(new Transition(s2, "ship"));
+      const process = new ProcessBuilder("p")
+        .addState("new", { initial: true })
+        .addState("shipped")
+        .addTransition("new", "shipped", { event: "ship" })
+        .build();
+      const s1 = process.getState("new");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -140,9 +165,12 @@ describe("GraphBuilder", () => {
     });
 
     it("should respect direction option", () => {
-      const s1 = new State("a");
-      const s2 = new State("b");
-      s1.addTransition(new Transition(s2, "go"));
+      const process = new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .addState("b")
+        .addTransition("a", "b", { event: "go" })
+        .build();
+      const s1 = process.getState("a");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -152,10 +180,13 @@ describe("GraphBuilder", () => {
     });
 
     it("should join multiline labels with separator", () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
       const cond = new CallbackCondition("isReady", () => true);
-      s1.addTransition(new Transition(s2, "go", cond));
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go", condition: cond })
+        .build();
+      const s1 = process.getState("s1");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -166,10 +197,13 @@ describe("GraphBuilder", () => {
     });
 
     it("should handle automatic transitions (no event)", () => {
-      const s1 = new State("active");
-      const s2 = new State("expired");
       const cond = new CallbackCondition("timeout", () => true);
-      s1.addTransition(new Transition(s2, null, cond));
+      const process = new ProcessBuilder("p")
+        .addState("active", { initial: true })
+        .addState("expired")
+        .addTransition("active", "expired", { condition: cond })
+        .build();
+      const s1 = process.getState("active");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -179,9 +213,12 @@ describe("GraphBuilder", () => {
     });
 
     it("should handle state names with spaces and punctuation", () => {
-      const s1 = new State("in progress");
-      const s2 = new State("done now");
-      s1.addTransition(new Transition(s2, "finish"));
+      const process = new ProcessBuilder("p")
+        .addState("in progress", { initial: true })
+        .addState("done now")
+        .addTransition("in progress", "done now", { event: "finish" })
+        .build();
+      const s1 = process.getState("in progress");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -196,9 +233,12 @@ describe("GraphBuilder", () => {
     });
 
     it("should escape double quotes in state names", () => {
-      const s1 = new State('say "hello"');
-      const s2 = new State("end");
-      s1.addTransition(new Transition(s2, "go"));
+      const process = new ProcessBuilder("p")
+        .addState('say "hello"', { initial: true })
+        .addState("end")
+        .addTransition('say "hello"', "end", { event: "go" })
+        .build();
+      const s1 = process.getState('say "hello"');
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -210,9 +250,12 @@ describe("GraphBuilder", () => {
     });
 
     it("should produce distinct IDs for names that differ only by special chars", () => {
-      const s1 = new State("a-b");
-      const s2 = new State("a b");
-      s1.addTransition(new Transition(s2, "go"));
+      const process = new ProcessBuilder("p")
+        .addState("a-b", { initial: true })
+        .addState("a b")
+        .addTransition("a-b", "a b", { event: "go" })
+        .build();
+      const s1 = process.getState("a-b");
 
       const builder = new GraphBuilder();
       builder.addState(s1);
@@ -227,10 +270,13 @@ describe("GraphBuilder", () => {
     });
 
     it("should escape double quotes in edge labels", () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
       const cond = new CallbackCondition('say "hi"', () => true);
-      s1.addTransition(new Transition(s2, "go", cond));
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go", condition: cond })
+        .build();
+      const s1 = process.getState("s1");
 
       const builder = new GraphBuilder();
       builder.addState(s1);

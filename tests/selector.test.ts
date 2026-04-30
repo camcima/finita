@@ -1,13 +1,46 @@
 import { describe, it, expect } from "vitest";
 import {
-  State,
-  Transition,
+  ProcessBuilder,
   CallbackCondition,
   Tautology,
   OneOrNoneActiveTransition,
   ScoreTransition,
   WeightTransition,
 } from "../src/index.js";
+
+/** Helper: build a process and extract all transitions from a state. */
+function buildTransitions(
+  specs: Array<{
+    from: string;
+    to: string;
+    event?: string;
+    condition?:
+      | InstanceType<typeof CallbackCondition>
+      | InstanceType<typeof Tautology>;
+    weight?: number;
+  }>,
+): ReturnType<typeof Array.from> {
+  const stateNames = new Set<string>();
+  for (const s of specs) {
+    stateNames.add(s.from);
+    stateNames.add(s.to);
+  }
+  const builder = new ProcessBuilder("p");
+  let first = true;
+  for (const name of stateNames) {
+    builder.addState(name, first ? { initial: true } : {});
+    first = false;
+  }
+  for (const s of specs) {
+    builder.addTransition(s.from, s.to, {
+      event: s.event,
+      condition: s.condition,
+      weight: s.weight,
+    });
+  }
+  const process = builder.build();
+  return Array.from(process.getState(specs[0]!.from).getTransitions());
+}
 
 describe("OneOrNoneActiveTransition", () => {
   const selector = new OneOrNoneActiveTransition();
@@ -17,54 +50,65 @@ describe("OneOrNoneActiveTransition", () => {
   });
 
   it("should return single transition", () => {
-    const t = new Transition(new State("s"));
-    expect(selector.selectTransition([t])).toBe(t);
+    const [t] = buildTransitions([{ from: "s", to: "t" }]);
+    expect(selector.selectTransition([t!])).toBe(t);
   });
 
   it("should throw for multiple transitions", () => {
-    const t1 = new Transition(new State("s1"));
-    const t2 = new Transition(new State("s2"));
-    expect(() => selector.selectTransition([t1, t2])).toThrow("More than one");
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "t1" },
+      { from: "s", to: "t2" },
+    ]);
+    expect(() => selector.selectTransition([t1!, t2!])).toThrow(
+      "More than one",
+    );
   });
 });
 
 describe("ScoreTransition", () => {
   it("should prefer transitions with event and condition", () => {
     const cond = new CallbackCondition("cond", () => true);
-    const t1 = new Transition(new State("s1")); // score 0
-    const t2 = new Transition(new State("s2"), "event"); // score 2
-    const t3 = new Transition(new State("s3"), "event", cond); // score 3
+    const [t1, t2, t3] = buildTransitions([
+      { from: "s", to: "t1" }, // score 0
+      { from: "s", to: "t2", event: "event" }, // score 2
+      { from: "s", to: "t3", event: "event2", condition: cond }, // score 3
+    ]);
     const selector = new ScoreTransition();
-    expect(selector.selectTransition([t1, t2, t3])).toBe(t3);
+    expect(selector.selectTransition([t1!, t2!, t3!])).toBe(t3);
   });
 
   it("should delegate ties to inner selector", () => {
-    const t1 = new Transition(new State("s1"), "a");
-    const t2 = new Transition(new State("s2"), "b");
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "t1", event: "a" },
+      { from: "s", to: "t2", event: "b" },
+    ]);
     const selector = new ScoreTransition();
-    expect(() => selector.selectTransition([t1, t2])).toThrow("More than one");
+    expect(() => selector.selectTransition([t1!, t2!])).toThrow(
+      "More than one",
+    );
   });
 });
 
 describe("WeightTransition", () => {
   it("should prefer highest weight", () => {
-    const t1 = new Transition(new State("s1"));
-    t1.setWeight(1);
-    const t2 = new Transition(new State("s2"));
-    t2.setWeight(5);
-    const t3 = new Transition(new State("s3"));
-    t3.setWeight(3);
+    const [t1, t2, t3] = buildTransitions([
+      { from: "s", to: "t1", weight: 1 },
+      { from: "s", to: "t2", weight: 5 },
+      { from: "s", to: "t3", weight: 3 },
+    ]);
     const selector = new WeightTransition();
-    expect(selector.selectTransition([t1, t2, t3])).toBe(t2);
+    expect(selector.selectTransition([t1!, t2!, t3!])).toBe(t2);
   });
 
   it("should delegate ties to inner selector", () => {
-    const t1 = new Transition(new State("s1"));
-    t1.setWeight(5);
-    const t2 = new Transition(new State("s2"));
-    t2.setWeight(5);
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "t1", weight: 5 },
+      { from: "s", to: "t2", weight: 5 },
+    ]);
     const selector = new WeightTransition();
-    expect(() => selector.selectTransition([t1, t2])).toThrow("More than one");
+    expect(() => selector.selectTransition([t1!, t2!])).toThrow(
+      "More than one",
+    );
   });
 });
 
@@ -72,78 +116,75 @@ describe("WeightTransition", () => {
 
 describe("ScoreTransition (PHP-ported)", () => {
   it("should select single transition without event or condition", () => {
-    const target = new State("TargetState");
-    const t = new Transition(target);
+    const [t] = buildTransitions([{ from: "s", to: "target" }]);
     const selector = new ScoreTransition();
-    expect(selector.selectTransition([t])).toBe(t);
+    expect(selector.selectTransition([t!])).toBe(t);
   });
 
   it("should prefer transition with condition over bare transition", () => {
-    const target = new State("TargetState");
-    const tBare = new Transition(target);
     const condition = new Tautology("Always True");
-    const tWithCondition = new Transition(target, null, condition);
+    const [tBare, tWithCondition] = buildTransitions([
+      { from: "s", to: "target1" },
+      { from: "s", to: "target2", condition },
+    ]);
     const selector = new ScoreTransition();
-    expect(selector.selectTransition([tBare, tWithCondition])).toBe(
+    expect(selector.selectTransition([tBare!, tWithCondition!])).toBe(
       tWithCondition,
     );
   });
 
   it("should prefer transition with event over bare transition", () => {
-    const target = new State("TargetState");
-    const tBare = new Transition(target);
-    const tWithEvent = new Transition(target, "testEvent");
+    const [tBare, tWithEvent] = buildTransitions([
+      { from: "s", to: "target1" },
+      { from: "s", to: "target2", event: "testEvent" },
+    ]);
     const selector = new ScoreTransition();
-    expect(selector.selectTransition([tBare, tWithEvent])).toBe(tWithEvent);
+    expect(selector.selectTransition([tBare!, tWithEvent!])).toBe(tWithEvent);
   });
 
   it("should prefer transition with event and condition over all others", () => {
-    const target = new State("TargetState");
-    const tBare = new Transition(target);
     const condition = new Tautology("Always True");
-    const tWithCondition = new Transition(target, null, condition);
-    const tWithEventAndCondition = new Transition(
-      target,
-      "testEvent",
-      condition,
-    );
+    const [tBare, tWithCondition, tWithEventAndCondition] = buildTransitions([
+      { from: "s", to: "target1" },
+      { from: "s", to: "target2", condition },
+      { from: "s", to: "target3", event: "testEvent", condition },
+    ]);
     const selector = new ScoreTransition();
     expect(
       selector.selectTransition([
-        tBare,
-        tWithCondition,
-        tWithEventAndCondition,
+        tBare!,
+        tWithCondition!,
+        tWithEventAndCondition!,
       ]),
     ).toBe(tWithEventAndCondition);
   });
 
   it("should throw if more than one transition at highest score level", () => {
-    const target = new State("TargetState");
-    const t1 = new Transition(target);
-    const t2 = new Transition(target);
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "target1" },
+      { from: "s", to: "target2" },
+    ]);
     const selector = new ScoreTransition();
-    expect(() => selector.selectTransition([t1, t2])).toThrow();
+    expect(() => selector.selectTransition([t1!, t2!])).toThrow();
   });
 });
 
 describe("WeightTransition (PHP-ported)", () => {
   it("should prefer transition with higher weight (small values)", () => {
-    const target = new State("TargetState");
-    const t1 = new Transition(target);
-    t1.setWeight(0.001);
-    const t2 = new Transition(target);
-    t2.setWeight(0.002);
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "target1", weight: 0.001 },
+      { from: "s", to: "target2", weight: 0.002 },
+    ]);
     const selector = new WeightTransition();
-    expect(selector.selectTransition([t1, t2])).toBe(t2);
+    expect(selector.selectTransition([t1!, t2!])).toBe(t2);
   });
 
   it("should throw if more than one transition has highest weight", () => {
-    const target = new State("TargetState");
-    const t1 = new Transition(target);
-    t1.setWeight(0.001);
-    const t2 = new Transition(target);
-    t2.setWeight(0.001);
+    const [t1, t2] = buildTransitions([
+      { from: "s", to: "target1", weight: 0.001 },
+      { from: "s", to: "target2", weight: 0.001 },
+    ]);
     const selector = new WeightTransition();
-    expect(() => selector.selectTransition([t1, t2])).toThrow();
+    expect(() => selector.selectTransition([t1!, t2!])).toThrow();
   });
 });
