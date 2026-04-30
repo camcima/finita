@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { StateCollection } from "../src/StateCollection.js";
-import { StateNotFoundError } from "../src/error/index.js";
+import {
+  StateNotFoundError,
+  StateEventNotFoundError,
+} from "../src/error/index.js";
 import { ProcessBuilder } from "../src/ProcessBuilder.js";
 
 describe("typed throws", () => {
@@ -35,6 +38,28 @@ describe("typed throws", () => {
       }
       expect(caught).toBeInstanceOf(StateNotFoundError);
       expect((caught as StateNotFoundError).message).toContain("(none)");
+    });
+  });
+
+  describe("State.getEvent", () => {
+    it("throws StateEventNotFoundError with stateName and eventName", () => {
+      const process = new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .addState("b")
+        .addTransition("a", "b", { event: "go" })
+        .build();
+      const a = process.getState("a");
+      let caught: unknown;
+      try {
+        a.getEvent("nope");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(StateEventNotFoundError);
+      const e = caught as StateEventNotFoundError;
+      expect(e.code).toBe("stateEventNotFound");
+      expect(e.stateName).toBe("a");
+      expect(e.eventName).toBe("nope");
     });
   });
 });

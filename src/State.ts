@@ -4,6 +4,7 @@ import type { EventInterface } from "./interfaces/EventInterface.js";
 import type { InternalConstructionKey } from "./internal/InternalConstruction.js";
 import { INTERNAL_CONSTRUCTION_KEY } from "./internal/InternalConstruction.js";
 import { Event } from "./Event.js";
+import { StateEventNotFoundError } from "./error/StateEventNotFoundError.js";
 
 export class State implements StateInterface {
   private readonly name: string;
@@ -70,7 +71,7 @@ export class State implements StateInterface {
   getEvent(name: string): EventInterface {
     const event = this.events.get(name);
     if (!event) {
-      throw new Error(`State "${this.name}" has no event "${name}"`);
+      throw new StateEventNotFoundError(this.name, name);
     }
     return event;
   }
