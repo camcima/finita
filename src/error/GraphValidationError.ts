@@ -5,7 +5,8 @@ export type GraphValidationCode =
   | "unknownSource"
   | "missingInitialState"
   | "multipleInitialStates"
-  | "emptyEventName"
+  | "invalidEventName"
+  | "invalidConditionName"
   | "orphanState";
 
 export class GraphValidationError extends FinitaError {

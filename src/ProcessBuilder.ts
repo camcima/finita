@@ -78,14 +78,15 @@ export class ProcessBuilder<TSubject = unknown> {
     }
     let eventName: string | null = null;
     if (options.event !== undefined) {
-      if (options.event.trim() === "") {
+      const raw = options.event;
+      if (raw.trim() === "" || raw !== raw.trim()) {
         throw new GraphValidationError(
-          "emptyEventName",
-          `addTransition called with an empty/whitespace event name from "${fromState}" to "${toState}"`,
-          { fromState, toState },
+          "invalidEventName",
+          `addTransition called with an empty or whitespace-padded event name from "${fromState}" to "${toState}"`,
+          { fromState, toState, eventName: raw },
         );
       }
-      eventName = options.event;
+      eventName = raw;
     }
     this.transitionSpecs.push({
       fromState,
@@ -263,7 +264,10 @@ export class ProcessBuilder<TSubject = unknown> {
 
     // Phase 2: build Transitions targeting Phase-1 States, then attach.
     const dedupSeen = new Set<string>();
-    const transitionsByState = new Map<string, TransitionInterface<TSubject>[]>();
+    const transitionsByState = new Map<
+      string,
+      TransitionInterface<TSubject>[]
+    >();
     for (const spec of this.stateSpecs.values()) {
       transitionsByState.set(spec.name, []);
     }
