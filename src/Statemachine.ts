@@ -172,12 +172,19 @@ export class Statemachine<
   }
 
   private async runOperation(op: QueuedOperation): Promise<void> {
-    let acquired = false;
+    // If the caller has already acquired the mutex (e.g. manual lock
+    // management with autoreleaseLock: false), don't reacquire — many
+    // mutex implementations (database advisory locks, redis SET NX, etc.)
+    // are not idempotent and will fail on the second acquire. We only
+    // release in this method if we acquired in this method.
+    let acquiredHere = false;
     try {
-      if (!(await this.mutex.acquireLock())) {
-        throw new LockCanNotBeAcquiredError("Lock can not be acquired!");
+      if (!this.mutex.isAcquired()) {
+        if (!(await this.mutex.acquireLock())) {
+          throw new LockCanNotBeAcquiredError("Lock can not be acquired!");
+        }
+        acquiredHere = true;
       }
-      acquired = true;
 
       const event =
         op.kind === "triggerEvent" ? this.resolveEvent(op.eventName!) : null;
@@ -187,7 +194,7 @@ export class Statemachine<
     } catch (err) {
       op.reject(err);
     } finally {
-      if (acquired && this.autoreleaseLock) {
+      if (acquiredHere && this.autoreleaseLock) {
         try {
           await this.mutex.releaseLock();
         } catch {
