@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Statemachine,
   CallbackCondition,
   CallbackObserver,
@@ -12,20 +10,19 @@ import type { LockAdapterInterface } from "../src/index.js";
 
 describe("Integration: async condition + observer + mutex", () => {
   it("should handle async conditions that simulate a DB check", async () => {
-    const s1 = new State("pending");
-    const s2 = new State("approved");
-    const s3 = new State("rejected");
-
     const dbCheck = new CallbackCondition("dbApprovalCheck", async () => {
       // Simulate async DB query
       await new Promise((resolve) => setTimeout(resolve, 5));
       return true;
     });
 
-    s1.addTransition(new Transition(s2, null, dbCheck));
-    s1.addTransition(new Transition(s3, "reject"));
-
-    const process = new Process("approval", s1);
+    const process = new ProcessBuilder("approval")
+      .addState("pending", { initial: true })
+      .addState("approved")
+      .addState("rejected")
+      .addTransition("pending", "approved", { condition: dbCheck })
+      .addTransition("pending", "rejected", { event: "reject" })
+      .build();
     const sm = new Statemachine({}, process);
 
     await sm.checkTransitions();
@@ -33,9 +30,11 @@ describe("Integration: async condition + observer + mutex", () => {
   });
 
   it("should handle async observers that simulate an API call", async () => {
-    const s1 = new State("new");
-    const s2 = new State("notified");
-    s1.addTransition(new Transition(s2, "notify"));
+    const process = new ProcessBuilder("notification")
+      .addState("new", { initial: true })
+      .addState("notified")
+      .addTransition("new", "notified", { event: "notify" })
+      .build();
 
     const apiCalls: string[] = [];
     const asyncObserver = new CallbackObserver(async () => {
@@ -43,9 +42,8 @@ describe("Integration: async condition + observer + mutex", () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
       apiCalls.push("notification_sent");
     });
-    s1.getEvent("notify").attach(asyncObserver);
+    process.getState("new").getEvent("notify").attach(asyncObserver);
 
-    const process = new Process("notification", s1);
     const sm = new Statemachine({}, process);
 
     await sm.triggerEvent("notify");
@@ -73,14 +71,14 @@ describe("Integration: async condition + observer + mutex", () => {
       },
     };
 
-    const s1 = new State("idle");
-    const s2 = new State("active");
-    s1.addTransition(new Transition(s2, "start"));
-    s2.addTransition(new Transition(s1, "stop"));
-
-    const process = new Process("worker", s1);
+    const process = new ProcessBuilder("worker")
+      .addState("idle", { initial: true })
+      .addState("active")
+      .addTransition("idle", "active", { event: "start" })
+      .addTransition("active", "idle", { event: "stop" })
+      .build();
     const mutex = new LockAdapterMutex(asyncAdapter, "worker-lock");
-    const sm = new Statemachine({}, process, null, null, mutex);
+    const sm = new Statemachine({}, process, { mutex });
 
     await sm.triggerEvent("start");
     expect(sm.getCurrentState().getName()).toBe("active");
