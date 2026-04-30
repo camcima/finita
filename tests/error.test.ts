@@ -3,6 +3,7 @@ import {
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   DuplicateStateError,
+  ProcessFinalizedError,
   State,
   StateCollection,
 } from "../src/index.js";
@@ -58,5 +59,15 @@ describe("DuplicateStateError", () => {
     const s1 = new State("s1");
     collection.addState(s1);
     expect(() => collection.addState(s1)).not.toThrow();
+  });
+});
+
+describe("ProcessFinalizedError", () => {
+  it("captures the builder name and is an Error", () => {
+    const err = new ProcessFinalizedError("orderFulfillment");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("ProcessFinalizedError");
+    expect(err.processName).toBe("orderFulfillment");
+    expect(err.message).toContain("orderFulfillment");
   });
 });

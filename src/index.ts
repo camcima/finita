@@ -104,4 +104,5 @@ export {
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   DuplicateStateError,
+  ProcessFinalizedError,
 } from "./error/index.js";
