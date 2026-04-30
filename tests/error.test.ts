@@ -4,6 +4,7 @@ import {
   LockCanNotBeAcquiredError,
   DuplicateStateError,
   ProcessFinalizedError,
+  GraphValidationError,
   State,
   StateCollection,
 } from "../src/index.js";
@@ -69,5 +70,21 @@ describe("ProcessFinalizedError", () => {
     expect(err.name).toBe("ProcessFinalizedError");
     expect(err.processName).toBe("orderFulfillment");
     expect(err.message).toContain("orderFulfillment");
+  });
+});
+
+describe("GraphValidationError", () => {
+  it("captures violation details", () => {
+    const err = new GraphValidationError(
+      "unknownTarget",
+      `Transition target "x" was not declared as a state`,
+      { fromState: "a", toState: "x" },
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("GraphValidationError");
+    expect(err.code).toBe("unknownTarget");
+    expect(err.message).toContain("unknownTarget");
+    expect(err.message).toContain('"x"');
+    expect(err.details).toEqual({ fromState: "a", toState: "x" });
   });
 });

@@ -105,4 +105,6 @@ export {
   LockCanNotBeAcquiredError,
   DuplicateStateError,
   ProcessFinalizedError,
+  GraphValidationError,
 } from "./error/index.js";
+export type { GraphValidationCode } from "./error/index.js";
