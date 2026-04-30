@@ -128,9 +128,25 @@ In v2, calling `triggerEvent` while another `triggerEvent` was in flight on the 
 
 If your code relied on the throw to detect a race condition, replace it with explicit serialization at the application layer (e.g., debounce or mutex).
 
-## 7. Mutex — no `isAcquired()` short-circuit
+## 7. Mutex — manual lock management composes with non-idempotent mutexes
 
-`Statemachine.acquireLock()` now always delegates to `mutex.acquireLock()`. A mutex implementation whose `isAcquired()` returns `true` but whose `acquireLock()` returns `false` will cause the operation to fail with `LockCanNotBeAcquiredError`. This is the intended contract; v2's short-circuit hid bugs.
+In v2, `runOperation` called `mutex.acquireLock()` unconditionally on every operation. That broke manual lock management with `autoreleaseLock: false` against non-idempotent mutex implementations like `pg_try_advisory_lock` or redis `SET NX`, because the second `acquireLock()` would either return `false` or throw.
+
+In v3, `runOperation` now consults `mutex.isAcquired()` first. If the mutex is already held, it skips the redundant `acquireLock()` and runs the operation under the existing lock. Because `runOperation` only releases what it itself acquired, manual `acquireLock()` → `triggerEvent(...)` → `releaseLock()` composes correctly:
+
+```typescript
+const sm = new Statemachine(subject, process, {
+  mutex: new LockAdapterMutex(adapter, "resource"),
+  autoreleaseLock: false,
+});
+
+await sm.acquireLock(); // acquired exactly once
+await sm.triggerEvent("go"); // runs under the existing lock; no reacquire
+await sm.triggerEvent("next"); // also runs under the existing lock
+await sm.releaseLock(); // released exactly once
+```
+
+If the user did not manually acquire, `runOperation` acquires-and-releases per call as before (subject to `autoreleaseLock`).
 
 ## 8. Removed APIs
 
