@@ -243,6 +243,28 @@ describe("ProcessBuilder", () => {
     expect(tB.getTargetState()).toBe(process.getState("c"));
   });
 
+  it("transition target identity holds for cycles", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "a", { event: "back" })
+      .build();
+    const tA = Array.from(process.getState("a").getTransitions())[0]!;
+    expect(tA.getTargetState()).toBe(process.getState("b"));
+    const tB = Array.from(process.getState("b").getTransitions())[0]!;
+    expect(tB.getTargetState()).toBe(process.getState("a"));
+  });
+
+  it("transition target identity holds for self-loops", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addTransition("a", "a", { event: "stay" })
+      .build();
+    const t = Array.from(process.getState("a").getTransitions())[0]!;
+    expect(t.getTargetState()).toBe(process.getState("a"));
+  });
+
   it("returned Process is frozen", () => {
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })

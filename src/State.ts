@@ -7,14 +7,13 @@ import { Event } from "./Event.js";
 
 export class State implements StateInterface {
   private readonly name: string;
-  private readonly transitions: ReadonlySet<TransitionInterface>;
+  private _transitions: ReadonlySet<TransitionInterface> | null = null;
   private readonly events: ReadonlyMap<string, EventInterface>;
   private readonly metadata: ReadonlyMap<string, unknown>;
 
   constructor(
     key: InternalConstructionKey,
     name: string,
-    transitions: Iterable<TransitionInterface>,
     eventNames: Iterable<string>,
     metadata: ReadonlyMap<string, unknown>,
   ) {
@@ -22,7 +21,6 @@ export class State implements StateInterface {
       throw new Error("State is not user-constructible; use ProcessBuilder.");
     }
     this.name = name;
-    this.transitions = new Set(transitions);
     const events = new Map<string, EventInterface>();
     for (const en of eventNames) {
       events.set(en, new Event(en));
@@ -31,12 +29,34 @@ export class State implements StateInterface {
     this.metadata = new Map(metadata);
   }
 
+  /**
+   * Internal: populate transitions after State construction.
+   * May only be called once and only with the construction key.
+   * Used by ProcessBuilder to break the cycle: State must exist before
+   * Transitions can target it, but State needs its transitions to be useful.
+   */
+  _initTransitions(
+    key: InternalConstructionKey,
+    transitions: Iterable<TransitionInterface>,
+  ): void {
+    if (key !== INTERNAL_CONSTRUCTION_KEY) {
+      throw new Error("_initTransitions is internal");
+    }
+    if (this._transitions !== null) {
+      throw new Error(`State "${this.name}" transitions already set`);
+    }
+    this._transitions = new Set(transitions);
+  }
+
   getName(): string {
     return this.name;
   }
 
   getTransitions(): Iterable<TransitionInterface> {
-    return this.transitions;
+    if (this._transitions === null) {
+      return [];
+    }
+    return this._transitions;
   }
 
   getEventNames(): string[] {
