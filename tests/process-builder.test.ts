@@ -179,8 +179,8 @@ describe("ProcessBuilder", () => {
   });
 
   it("rejects conflicting duplicate transitions (closes #6)", () => {
-    const c1 = new CallbackCondition(async () => true, "shared");
-    const c2 = new CallbackCondition(async () => false, "shared");
+    const c1 = new CallbackCondition("shared", async () => true);
+    const c2 = new CallbackCondition("shared", async () => false);
     // Same name "shared" but different identity AND different logic.
     // Identity differs but name matches → according to spec, condition name
     // is the dedup key, so this is dedup'd. We instead test the conflict
