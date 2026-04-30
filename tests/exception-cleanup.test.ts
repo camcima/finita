@@ -1,19 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  State,
-  Transition,
-  Process,
   Event,
   Statemachine,
-  Dispatcher,
+  ProcessBuilder,
   CallbackObserver,
   Tautology,
   OnEnterObserver,
   LockAdapterMutex,
 } from "../src/index.js";
 import type {
-  Observer,
-  ObservableSubject,
+  AfterTransitionObserver,
+  TransitionFrame,
+  EnqueueContext,
   LockAdapterInterface,
   MutexInterface,
 } from "../src/index.js";
@@ -43,11 +41,12 @@ function createLockAdapter(): LockAdapterInterface {
 }
 
 function createTwoStateMachine(mutex?: LockAdapterMutex) {
-  const s1 = new State("s1");
-  const s2 = new State("s2");
-  s1.addTransition(new Transition(s2, "go"));
-  const process = new Process("test", s1);
-  return new Statemachine({}, process, null, null, mutex ?? null);
+  const process = new ProcessBuilder("test")
+    .addState("s1", { initial: true })
+    .addState("s2")
+    .addTransition("s1", "s2", { event: "go" })
+    .build();
+  return new Statemachine({}, process, { mutex: mutex ?? undefined });
 }
 
 describe("Exception cleanup", () => {
@@ -103,18 +102,22 @@ describe("Exception cleanup", () => {
       const adapter = createLockAdapter();
       const mutex = new LockAdapterMutex(adapter, "res");
 
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, "go"));
-      const process = new Process("test", s1);
-      const sm = new Statemachine({}, process, null, null, mutex);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
+      const sm = new Statemachine({}, process, { mutex });
 
       let shouldThrow = true;
-      s1.getEvent("go").attach(
-        new CallbackObserver(() => {
-          if (shouldThrow) throw new Error("event observer error");
-        }),
-      );
+      process
+        .getState("s1")
+        .getEvent("go")
+        .attach(
+          new CallbackObserver(() => {
+            if (shouldThrow) throw new Error("event observer error");
+          }),
+        );
 
       await expect(sm.triggerEvent("go")).rejects.toThrow();
       expect(sm.isLockAcquired()).toBe(false);
@@ -132,44 +135,33 @@ describe("Exception cleanup", () => {
       const mutex = new LockAdapterMutex(adapter, "res");
       const sm = createTwoStateMachine(mutex);
 
-      const throwingObserver: Observer = {
-        update(_subject: ObservableSubject) {
+      const throwingObserver: AfterTransitionObserver = {
+        notify(_frame: TransitionFrame, _ctx: EnqueueContext) {
           throw new Error("SM observer error");
         },
       };
-      sm.attach(throwingObserver);
+      sm.attachAfter(throwingObserver);
 
       await expect(sm.triggerEvent("go")).rejects.toThrow();
       expect(sm.isLockAcquired()).toBe(false);
     });
 
-    it("should clear transient fields when SM observer throws", async () => {
-      const sm = createTwoStateMachine();
-
-      const throwingObserver: Observer = {
-        update(_subject: ObservableSubject) {
-          throw new Error("SM observer error");
-        },
-      };
-      sm.attach(throwingObserver);
-
-      await expect(sm.triggerEvent("go")).rejects.toThrow();
-      expect(sm.getCurrentContext()).toBeNull();
-      expect(sm.getSelectedTransition()).toBeNull();
-      expect(sm.getLastState()).toBeNull();
-    });
+    // "should clear transient fields when SM observer throws" is dropped:
+    // v3 has no transient fields (selectedTransition, currentContext) — the
+    // frame is passed directly to observers and not stored on the SM.
 
     it("should advance currentState to target even when SM observer throws", async () => {
       const sm = createTwoStateMachine();
 
-      const throwingObserver: Observer = {
-        update(_subject: ObservableSubject) {
+      const throwingObserver: AfterTransitionObserver = {
+        notify(_frame: TransitionFrame, _ctx: EnqueueContext) {
           throw new Error("SM observer error");
         },
       };
-      sm.attach(throwingObserver);
+      sm.attachAfter(throwingObserver);
 
       await expect(sm.triggerEvent("go")).rejects.toThrow();
+      // In v3, after-observers run POST commit, so state is already s2
       expect(sm.getCurrentState().getName()).toBe("s2");
     });
   });
@@ -179,18 +171,19 @@ describe("Exception cleanup", () => {
       const adapter = createLockAdapter();
       const mutex = new LockAdapterMutex(adapter, "res");
 
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, null, new Tautology()));
-      const process = new Process("test", s1);
-      const sm = new Statemachine({}, process, null, null, mutex);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { condition: new Tautology() })
+        .build();
+      const sm = new Statemachine({}, process, { mutex });
 
-      const throwingObserver: Observer = {
-        update(_subject: ObservableSubject) {
+      const throwingObserver: AfterTransitionObserver = {
+        notify(_frame: TransitionFrame, _ctx: EnqueueContext) {
           throw new Error("SM observer error");
         },
       };
-      sm.attach(throwingObserver);
+      sm.attachAfter(throwingObserver);
 
       await expect(sm.checkTransitions()).rejects.toThrow();
       expect(sm.isLockAcquired()).toBe(false);
@@ -199,44 +192,39 @@ describe("Exception cleanup", () => {
 
   describe("Automatic transition cycle detection", () => {
     it("should throw on automatic self-transition via checkTransitions", async () => {
-      const s1 = new State("s1");
-      s1.addTransition(new Transition(s1, null, new Tautology()));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addTransition("s1", "s1", { condition: new Tautology() })
+        .build();
       const sm = new Statemachine({}, process);
 
       await expect(sm.checkTransitions()).rejects.toThrow(
-        /transition from current state "s1"/,
+        /Automatic transition cycle detected.*"s1"/,
       );
-      try {
-        await sm.checkTransitions();
-      } catch (e: unknown) {
-        expect((e as Error).cause).toBeInstanceOf(Error);
-        expect(((e as Error).cause as Error).message).toMatch(
-          /Automatic transition cycle detected.*"s1"/,
-        );
-      }
     });
 
     it("should throw on automatic self-transition via triggerEvent", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, "go"));
-      // s2 has an automatic self-transition — will be checked after state change
-      s2.addTransition(new Transition(s2, null, new Tautology()));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        // s2 has an automatic self-transition — will be checked after state change
+        .addTransition("s1", "s2", { event: "go" })
+        .addTransition("s2", "s2", { condition: new Tautology() })
+        .build();
       const sm = new Statemachine({}, process);
 
       await expect(sm.triggerEvent("go")).rejects.toThrow(
-        /transition from current state "s2"/,
+        /Automatic transition cycle detected.*"s2"/,
       );
     });
 
     it("should throw on multi-state automatic cycle (s1 -> s2 -> s1)", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, null, new Tautology()));
-      s2.addTransition(new Transition(s1, null, new Tautology()));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { condition: new Tautology() })
+        .addTransition("s2", "s1", { condition: new Tautology() })
+        .build();
       const sm = new Statemachine({}, process);
 
       try {
@@ -250,13 +238,14 @@ describe("Exception cleanup", () => {
     });
 
     it("should throw on 3-state automatic cycle (s1 -> s2 -> s3 -> s1)", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      const s3 = new State("s3");
-      s1.addTransition(new Transition(s2, null, new Tautology()));
-      s2.addTransition(new Transition(s3, null, new Tautology()));
-      s3.addTransition(new Transition(s1, null, new Tautology()));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addState("s3")
+        .addTransition("s1", "s2", { condition: new Tautology() })
+        .addTransition("s2", "s3", { condition: new Tautology() })
+        .addTransition("s3", "s1", { condition: new Tautology() })
+        .build();
       const sm = new Statemachine({}, process);
 
       try {
@@ -272,14 +261,15 @@ describe("Exception cleanup", () => {
     });
 
     it("should detect cycle after event-triggered transition", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      const s3 = new State("s3");
-      s1.addTransition(new Transition(s2, "go"));
-      // After arriving at s2, automatic cycle: s2 -> s3 -> s2
-      s2.addTransition(new Transition(s3, null, new Tautology()));
-      s3.addTransition(new Transition(s2, null, new Tautology()));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addState("s3")
+        // After arriving at s2, automatic cycle: s2 -> s3 -> s2
+        .addTransition("s1", "s2", { event: "go" })
+        .addTransition("s2", "s3", { condition: new Tautology() })
+        .addTransition("s3", "s2", { condition: new Tautology() })
+        .build();
       const sm = new Statemachine({}, process);
 
       try {
@@ -296,21 +286,23 @@ describe("Exception cleanup", () => {
       const adapter = createLockAdapter();
       const mutex = new LockAdapterMutex(adapter, "res");
 
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, null, new Tautology()));
-      s2.addTransition(new Transition(s1, null, new Tautology()));
-      const process = new Process("test", s1);
-      const sm = new Statemachine({}, process, null, null, mutex);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { condition: new Tautology() })
+        .addTransition("s2", "s1", { condition: new Tautology() })
+        .build();
+      const sm = new Statemachine({}, process, { mutex });
 
       await expect(sm.checkTransitions()).rejects.toThrow();
       expect(sm.isLockAcquired()).toBe(false);
     });
 
     it("should allow event-based self-transitions (not automatic)", async () => {
-      const s1 = new State("s1");
-      s1.addTransition(new Transition(s1, "retry"));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addTransition("s1", "s1", { event: "retry" })
+        .build();
       const sm = new Statemachine({}, process);
 
       // Event-based self-transitions are fine — they don't recurse automatically
@@ -345,12 +337,13 @@ describe("Exception cleanup", () => {
     }
 
     it("should not double-release lock on successful triggerEvent", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, "go"));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
       const mutex = createStrictMutex();
-      const sm = new Statemachine({}, process, null, null, mutex);
+      const sm = new Statemachine({}, process, { mutex });
 
       // With a strict mutex, double release would throw
       await sm.triggerEvent("go");
@@ -359,77 +352,54 @@ describe("Exception cleanup", () => {
     });
 
     it("should release exactly once when event observer throws", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, "go"));
-      const process = new Process("test", s1);
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
       const mutex = createStrictMutex();
-      const sm = new Statemachine({}, process, null, null, mutex);
+      const sm = new Statemachine({}, process, { mutex });
 
-      s1.getEvent("go").attach(
-        new CallbackObserver(() => {
-          throw new Error("event observer error");
-        }),
-      );
+      process
+        .getState("s1")
+        .getEvent("go")
+        .attach(
+          new CallbackObserver(() => {
+            throw new Error("event observer error");
+          }),
+        );
 
       await expect(sm.triggerEvent("go")).rejects.toThrow();
       expect(sm.isLockAcquired()).toBe(false);
-    });
-  });
-
-  describe("dispatchEvent cleanup", () => {
-    it("should release lock and clear fields when dispatcher.dispatch() throws", async () => {
-      const adapter = createLockAdapter();
-      const mutex = new LockAdapterMutex(adapter, "res");
-      const sm = createTwoStateMachine(mutex);
-
-      // Pre-invoke the dispatcher so dispatch() throws "Was already invoked!"
-      const dispatcher = new Dispatcher();
-      dispatcher.dispatch(sm.getCurrentState().getEvent("go"), []);
-      await dispatcher.invoke();
-
-      await expect(sm.dispatchEvent(dispatcher, "go")).rejects.toThrow(
-        "Was already invoked!",
-      );
-      expect(sm.isLockAcquired()).toBe(false);
-    });
-
-    it("should allow subsequent triggerEvent after dispatchEvent failure", async () => {
-      const adapter = createLockAdapter();
-      const mutex = new LockAdapterMutex(adapter, "res");
-      const sm = createTwoStateMachine(mutex);
-
-      // Pre-invoke the dispatcher so dispatch() throws
-      const dispatcher = new Dispatcher();
-      dispatcher.dispatch(sm.getCurrentState().getEvent("go"), []);
-      await dispatcher.invoke();
-
-      await expect(sm.dispatchEvent(dispatcher, "go")).rejects.toThrow();
-
-      // SM should be usable again
-      await sm.triggerEvent("go");
-      expect(sm.getCurrentState().getName()).toBe("s2");
     });
   });
 
   describe("OnEnterObserver with throwing nested triggerEvent", () => {
     it("should restore autoreleaseLock when onEnter event observer throws", async () => {
-      const s1 = new State("s1");
-      const s2 = new State("s2");
-      s1.addTransition(new Transition(s2, "go"));
-      // Self-transition for onEnter processing
-      s2.addTransition(new Transition(s2, "onEnter"));
-      s2.getEvent("onEnter").attach(
-        new CallbackObserver(() => {
-          throw new Error("onEnter observer error");
-        }),
-      );
+      const process = new ProcessBuilder("test")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        // Self-transition for onEnter processing
+        .addTransition("s2", "s2", { event: "onEnter" })
+        .build();
 
-      const process = new Process("test", s1);
+      process
+        .getState("s2")
+        .getEvent("onEnter")
+        .attach(
+          new CallbackObserver(() => {
+            throw new Error("onEnter observer error");
+          }),
+        );
+
       const sm = new Statemachine({}, process);
-      sm.attach(new OnEnterObserver());
+      sm.attachAfter(new OnEnterObserver());
 
-      await expect(sm.triggerEvent("go")).rejects.toThrow();
+      // In v3, OnEnterObserver enqueues "onEnter" as a separate operation.
+      // The chained op error does not propagate to the original caller,
+      // so triggerEvent("go") resolves successfully.
+      await sm.triggerEvent("go");
       expect(sm.isAutoreleaseLock()).toBe(true);
     });
   });
