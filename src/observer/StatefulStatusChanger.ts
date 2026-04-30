@@ -1,33 +1,17 @@
-import type { Observer, ObservableSubject } from "../interfaces/Observer.js";
-import type { StatemachineInterface } from "../interfaces/StatemachineInterface.js";
+import type { AfterTransitionObserver } from "../interfaces/AfterTransitionObserverInterface.js";
+import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js";
 import type { StatefulInterface } from "../interfaces/StatefulInterface.js";
 
-function isStatemachine(obj: unknown): obj is StatemachineInterface {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "getCurrentState" in obj &&
-    "getSubject" in obj
-  );
-}
+export class StatefulStatusChanger<TSubject extends StatefulInterface>
+  implements AfterTransitionObserver<TSubject>
+{
+  private readonly subject: TSubject;
 
-function isStateful(obj: unknown): obj is StatefulInterface {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "setCurrentStateName" in obj &&
-    typeof (obj as StatefulInterface).setCurrentStateName === "function"
-  );
-}
+  constructor(subject: TSubject) {
+    this.subject = subject;
+  }
 
-export class StatefulStatusChanger implements Observer {
-  update(subject: ObservableSubject): void {
-    if (isStatemachine(subject)) {
-      const subjectObj = subject.getSubject();
-      if (isStateful(subjectObj)) {
-        const stateName = subject.getCurrentState().getName();
-        subjectObj.setCurrentStateName(stateName);
-      }
-    }
+  notify(frame: TransitionFrame<TSubject>): void {
+    this.subject.setCurrentStateName(frame.toState.getName());
   }
 }
