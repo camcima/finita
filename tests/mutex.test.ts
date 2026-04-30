@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { NullMutex, LockAdapterMutex } from "../src/index.js";
-import type { LockAdapterInterface } from "../src/index.js";
+import {
+  NullMutex,
+  LockAdapterMutex,
+  Statemachine,
+  ProcessBuilder,
+  LockCanNotBeAcquiredError,
+} from "../src/index.js";
+import type { LockAdapterInterface, MutexInterface } from "../src/index.js";
 
 describe("NullMutex", () => {
   it("should always acquire lock", () => {
@@ -74,5 +80,25 @@ describe("LockAdapterMutex", () => {
     const mutex = new LockAdapterMutex(adapter, "resource1");
     await mutex.acquireLock();
     expect(await mutex.isLocked()).toBe(true);
+  });
+});
+
+describe("Statemachine mutex regression", () => {
+  it("does not short-circuit when isAcquired returns true (closes #1)", async () => {
+    const fakeMutex: MutexInterface = {
+      acquireLock: vi.fn(async () => false),
+      releaseLock: vi.fn(async () => {}),
+      isAcquired: vi.fn(() => true),
+    };
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process, { mutex: fakeMutex });
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(
+      LockCanNotBeAcquiredError,
+    );
+    expect(fakeMutex.acquireLock).toHaveBeenCalledTimes(1);
   });
 });
