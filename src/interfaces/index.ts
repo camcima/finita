@@ -3,6 +3,11 @@ export type { Named } from "./Named.js";
 export type { Metadata } from "./Metadata.js";
 export type { Weighted } from "./Weighted.js";
 export type { Observer, ObservableSubject } from "./Observer.js";
+export type {
+  AfterTransitionObserver,
+  EnqueueContext,
+} from "./AfterTransitionObserverInterface.js";
+export type { BeforeTransitionObserver } from "./BeforeTransitionObserverInterface.js";
 export type { ConditionInterface } from "./ConditionInterface.js";
 export type { EventInterface } from "./EventInterface.js";
 export type { TransitionInterface } from "./TransitionInterface.js";
