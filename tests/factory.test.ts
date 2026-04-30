@@ -1,18 +1,23 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Factory,
   SingleProcessDetector,
   AbstractNamedProcessDetector,
   StatefulStateNameDetector,
 } from "../src/index.js";
-import type { StatefulInterface, Observer } from "../src/index.js";
+import type {
+  StatefulInterface,
+  AfterTransitionObserver,
+  TransitionFrame,
+  EnqueueContext,
+} from "../src/index.js";
 
 describe("SingleProcessDetector", () => {
   it("should always return the same process", () => {
-    const process = new Process("test", new State("s1"));
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
     const detector = new SingleProcessDetector(process);
     expect(detector.detectProcess({})).toBe(process);
     expect(detector.detectProcess("anything")).toBe(process);
@@ -39,20 +44,22 @@ describe("StatefulStateNameDetector", () => {
 
 describe("Factory", () => {
   it("should create statemachine at initial state", async () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    const process = new Process("test", s1);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
     const factory = new Factory(new SingleProcessDetector(process));
     const sm = await factory.createStatemachine({});
     expect(sm.getCurrentState().getName()).toBe("s1");
   });
 
   it("should create statemachine at detected state", async () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    const process = new Process("test", s1);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
     const subject: StatefulInterface = {
       getCurrentStateName: () => "s2",
       setCurrentStateName: vi.fn(),
@@ -65,25 +72,33 @@ describe("Factory", () => {
     expect(sm.getCurrentState().getName()).toBe("s2");
   });
 
-  it("should attach observers to created statemachines", async () => {
-    const process = new Process("test", new State("s1"));
+  it("should attach after-observers to created statemachines", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
     const factory = new Factory(new SingleProcessDetector(process));
-    const observer: Observer = { update: vi.fn() };
-    factory.attachStatemachineObserver(observer);
+    const observer: AfterTransitionObserver = {
+      notify(_frame: TransitionFrame, _ctx: EnqueueContext) {},
+    };
+    factory.attachAfterObserver(observer);
     const sm = await factory.createStatemachine({});
     // Observer should be attached
-    const observers = Array.from(sm.getObservers());
+    const observers = Array.from(sm.getAfterObservers());
     expect(observers).toContain(observer);
   });
 
-  it("should support detach observer", async () => {
-    const process = new Process("test", new State("s1"));
+  it("should support detach after-observer", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
     const factory = new Factory(new SingleProcessDetector(process));
-    const observer: Observer = { update: vi.fn() };
-    factory.attachStatemachineObserver(observer);
-    factory.detachStatemachineObserver(observer);
+    const observer: AfterTransitionObserver = {
+      notify(_frame: TransitionFrame, _ctx: EnqueueContext) {},
+    };
+    factory.attachAfterObserver(observer);
+    factory.detachAfterObserver(observer);
     const sm = await factory.createStatemachine({});
-    const observers = Array.from(sm.getObservers());
+    const observers = Array.from(sm.getAfterObservers());
     expect(observers).not.toContain(observer);
   });
 });
@@ -92,7 +107,9 @@ describe("Factory", () => {
 
 describe("SingleProcessDetector (PHP-ported)", () => {
   it("should always return the same process", () => {
-    const process = new Process("test", new State("new"));
+    const process = new ProcessBuilder("test")
+      .addState("new", { initial: true })
+      .build();
     const detector = new SingleProcessDetector(process);
     const subject = {};
     const result = detector.detectProcess(subject);
@@ -115,8 +132,12 @@ class TestNamedProcessDetector extends AbstractNamedProcessDetector {
 
 describe("AbstractNamedProcessDetector (PHP-ported)", () => {
   it("should detect process by name from subject", () => {
-    const processA = new Process("A", new State("new"));
-    const processB = new Process("B", new State("new"));
+    const processA = new ProcessBuilder("A")
+      .addState("new", { initial: true })
+      .build();
+    const processB = new ProcessBuilder("B")
+      .addState("new", { initial: true })
+      .build();
 
     const detector = new TestNamedProcessDetector(
       (subject: unknown) => (subject as { process: string }).process,
@@ -137,7 +158,9 @@ describe("AbstractNamedProcessDetector (PHP-ported)", () => {
   });
 
   it("should report hasProcess", () => {
-    const process = new Process("test", new State("s"));
+    const process = new ProcessBuilder("test")
+      .addState("s", { initial: true })
+      .build();
     const detector = new TestNamedProcessDetector(() => "test");
     expect(detector.hasProcess("test")).toBe(false);
     detector.addProcess(process);
@@ -165,8 +188,9 @@ describe("StatefulStateNameDetector (PHP-ported)", () => {
 
 describe("Factory (PHP-ported)", () => {
   it("should create a statemachine instance for the subject", async () => {
-    const initialState = new State("TestState");
-    const process = new Process("TestProcess", initialState);
+    const process = new ProcessBuilder("TestProcess")
+      .addState("TestState", { initial: true })
+      .build();
     const detector = new SingleProcessDetector(process);
     const factory = new Factory(detector);
     const sm = await factory.createStatemachine({});
