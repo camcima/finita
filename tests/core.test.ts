@@ -6,6 +6,7 @@ import {
   CallbackObserver,
   CallbackCondition,
   Tautology,
+  Contradiction,
   WrongEventForStateError,
 } from "../src/index.js";
 import type {
@@ -347,15 +348,38 @@ describe("Statemachine", () => {
     expect(fn).toHaveBeenCalled();
   });
 
-  it("should not execute observers on self-transition", async () => {
+  it("event observers fire on self-transition events (review fix)", async () => {
     const { sm, opened } = createDoorMachine();
-    await sm.triggerEvent("open");
+    await sm.triggerEvent("open"); // closed -> opened
     const fn = vi.fn();
     opened.getEvent("open").attach(new CallbackObserver(fn));
-    await sm.triggerEvent("open");
-    // In v3, self-transitions (currentState === target) are no-ops: neither
-    // event observers nor statemachine observers are notified.
-    expect(fn).not.toHaveBeenCalled();
+    await sm.triggerEvent("open"); // opened -> opened (self)
+    // Self-transitions don't change state, but event-attached observers
+    // are imperative commands and must fire whenever the event is
+    // resolved on the current state. State-machine after-observers
+    // remain gated on state change (no-op on self-transition).
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(sm.getCurrentState().getName()).toBe("opened");
+  });
+
+  it("event observers fire even when the matching transition has a false condition (review fix)", async () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", {
+        event: "go",
+        condition: new Contradiction(),
+      })
+      .build();
+    const fn = vi.fn();
+    process.getState("a").getEvent("go").attach(new CallbackObserver(fn));
+    const sm = new Statemachine({}, process);
+    await sm.triggerEvent("go");
+    // Transition didn't fire (Contradiction condition is always false),
+    // but the event observer still ran — the imperative command on the
+    // event must fire whenever the event is resolved.
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(sm.getCurrentState().getName()).toBe("a");
   });
 
   it("should throw for wrong event", async () => {

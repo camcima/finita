@@ -223,6 +223,17 @@ export class Statemachine<
     let event = initialEvent;
     const automaticVisited = new Set<StateInterface>();
 
+    // Fire event-attached observers (imperative commands attached via
+    // event.attach()) when the user-supplied event is resolved, regardless
+    // of whether a transition fires. Runs once per triggerEvent call —
+    // automatic transitions in the iteration loop have event=null and don't
+    // re-trigger this dispatch.
+    if (event) {
+      const dispatcher = new Dispatcher();
+      dispatcher.dispatch(event, [this.subject, context]);
+      await dispatcher.invoke();
+    }
+
     while (true) {
       const transitions = this.currentState.getTransitions();
       const active = await ActiveTransitionFilter.filter(
@@ -266,13 +277,6 @@ export class Statemachine<
         // Before phase — first observer to throw aborts.
         for (const observer of this.beforeObservers) {
           await observer.notify(proposedFrame);
-        }
-
-        // Event-bound dispatcher commands (legacy Event observers).
-        if (event) {
-          const dispatcher = new Dispatcher();
-          dispatcher.dispatch(event, [this.subject, context]);
-          await dispatcher.invoke();
         }
 
         // Commit.
