@@ -5,12 +5,17 @@ import {
   SingleProcessDetector,
   AbstractNamedProcessDetector,
   StatefulStateNameDetector,
+  ScoreTransition,
+  MutexFactory,
 } from "../src/index.js";
 import type {
   StatefulInterface,
   AfterTransitionObserver,
+  BeforeTransitionObserver,
   TransitionFrame,
+  ProposedTransitionFrame,
   EnqueueContext,
+  LockAdapterInterface,
 } from "../src/index.js";
 
 describe("SingleProcessDetector", () => {
@@ -100,6 +105,108 @@ describe("Factory", () => {
     const sm = await factory.createStatemachine({});
     const observers = Array.from(sm.getAfterObservers());
     expect(observers).not.toContain(observer);
+  });
+
+  it("attaches before-observers to created statemachines", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
+    const factory = new Factory(new SingleProcessDetector(process));
+    const observer: BeforeTransitionObserver = {
+      notify(_frame: ProposedTransitionFrame): void {},
+    };
+    factory.attachBeforeObserver(observer);
+    const sm = await factory.createStatemachine({});
+    expect(Array.from(sm.getBeforeObservers())).toContain(observer);
+  });
+
+  it("detaches before-observers so they are not propagated", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
+    const factory = new Factory(new SingleProcessDetector(process));
+    const observer: BeforeTransitionObserver = {
+      notify(_frame: ProposedTransitionFrame): void {},
+    };
+    factory.attachBeforeObserver(observer);
+    factory.detachBeforeObserver(observer);
+    const sm = await factory.createStatemachine({});
+    expect(Array.from(sm.getBeforeObservers())).not.toContain(observer);
+  });
+
+  it("setTransitionSelector configures the selector for created statemachines", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go", weight: 5 })
+      .build();
+    const factory = new Factory(new SingleProcessDetector(process));
+    factory.setTransitionSelector(new ScoreTransition());
+    const sm = await factory.createStatemachine({});
+    await sm.triggerEvent("go");
+    expect(sm.getCurrentState().getName()).toBe("s2");
+  });
+
+  it("setMutexFactory wires a per-subject mutex via createMutex", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
+
+    const calls: { resource: string; op: "acquire" | "release" }[] = [];
+    const adapter: LockAdapterInterface = {
+      acquireLock(resource: string): boolean {
+        calls.push({ resource, op: "acquire" });
+        return true;
+      },
+      releaseLock(resource: string): boolean {
+        calls.push({ resource, op: "release" });
+        return true;
+      },
+      isLocked(_resource: string): boolean {
+        return false;
+      },
+    };
+
+    const factory = new Factory<{ id: string }>(
+      new SingleProcessDetector(process),
+    );
+    factory.setMutexFactory(
+      new MutexFactory<{ id: string }>(adapter, (subject) => subject.id),
+    );
+
+    const sm = await factory.createStatemachine({ id: "user-42" });
+    expect(typeof sm.acquireLock).toBe("function");
+    await sm.triggerEvent("go");
+
+    // The factory's mutex should have been used during the operation.
+    expect(calls).toEqual([
+      { resource: "user-42", op: "acquire" },
+      { resource: "user-42", op: "release" },
+    ]);
+  });
+
+  it("setMutexFactory(null) clears the factory and falls back to default", async () => {
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
+    const adapter: LockAdapterInterface = {
+      acquireLock: () => true,
+      releaseLock: () => true,
+      isLocked: () => false,
+    };
+    const factory = new Factory<{ id: string }>(
+      new SingleProcessDetector(process),
+    );
+    factory.setMutexFactory(
+      new MutexFactory<{ id: string }>(adapter, (s) => s.id),
+    );
+    factory.setMutexFactory(null);
+    const sm = await factory.createStatemachine({ id: "x" });
+    expect(sm).toBeDefined();
   });
 });
 
