@@ -287,4 +287,74 @@ describe("GraphBuilder", () => {
       expect(mermaid).not.toMatch(/: .*"hi"/);
     });
   });
+
+  describe("event observers in transition labels", () => {
+    it('renders Named observers attached to events as "C: name"', () => {
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
+      const s1 = process.getState("s1");
+      const namedObserver = {
+        getName(): string {
+          return "auditCommand";
+        },
+        update(): void {},
+      };
+      s1.getEvent("go").attach(namedObserver);
+
+      const builder = new GraphBuilder();
+      builder.addState(s1);
+
+      const graph = builder.getGraph();
+      expect(graph.edges[0].label).toContain("E: go");
+      expect(graph.edges[0].label).toContain("C: auditCommand");
+    });
+
+    it("renders multiple observers in attach order, joined by comma", () => {
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
+      const s1 = process.getState("s1");
+      s1.getEvent("go").attach({
+        getName: () => "first",
+        update: () => {},
+      });
+      s1.getEvent("go").attach({
+        getName: () => "second",
+        update: () => {},
+      });
+
+      const builder = new GraphBuilder();
+      builder.addState(s1);
+
+      const graph = builder.getGraph();
+      expect(graph.edges[0].label).toContain("C: first, second");
+    });
+
+    it("falls back to String(obj) for observers that don't expose getName", () => {
+      const process = new ProcessBuilder("p")
+        .addState("s1", { initial: true })
+        .addState("s2")
+        .addTransition("s1", "s2", { event: "go" })
+        .build();
+      const s1 = process.getState("s1");
+      const unnamedObserver = {
+        toString(): string {
+          return "anon-observer";
+        },
+        update(): void {},
+      };
+      s1.getEvent("go").attach(unnamedObserver);
+
+      const builder = new GraphBuilder();
+      builder.addState(s1);
+
+      const graph = builder.getGraph();
+      expect(graph.edges[0].label).toContain("C: anon-observer");
+    });
+  });
 });
