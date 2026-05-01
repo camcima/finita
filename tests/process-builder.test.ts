@@ -213,6 +213,33 @@ describe("ProcessBuilder", () => {
     expect(process.hasState("orphan")).toBe(true);
   });
 
+  it("strictOrphans walks transitions and rejects states unreachable through them", () => {
+    // Initial state has transitions reaching "b" and "c" (transitively),
+    // exercising the BFS traversal in validateOrphans. The "lonely"
+    // state has no incoming transition and must be reported as orphaned.
+    expect(() =>
+      new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .addState("b")
+        .addState("c")
+        .addState("lonely")
+        .addTransition("a", "b", { event: "go" })
+        .addTransition("b", "c", { event: "next" })
+        .build({ strictOrphans: true }),
+    ).toThrow(/lonely/);
+  });
+
+  it("strictOrphans accepts a fully reachable graph", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addState("c")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "c", { event: "next" })
+      .build({ strictOrphans: true });
+    expect(process.hasState("c")).toBe(true);
+  });
+
   it("registers events implied by transitions", () => {
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })
