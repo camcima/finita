@@ -1,6 +1,6 @@
 {
   "name": "@camcima/finita",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "A full-featured finite state machine library for TypeScript",
   "type": "module",
   "main": "dist/index.cjs",
@@ -32,6 +32,7 @@
     "security:audit": "pnpm audit",
     "security:secrets": "gitleaks detect --no-banner",
     "release": "release-it",
+    "prepublishOnly": "pnpm run build && pnpm run lint && pnpm test && npm pack --dry-run",
     "prepare": "lefthook install"
   },
   "keywords": [
@@ -54,6 +55,9 @@
     "url": "https://github.com/camcima/finita/issues"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "packageManager": "pnpm@9.15.0",
   "pnpm": {
     "overrides": {

@@ -11,8 +11,8 @@
 [![codecov](https://codecov.io/gh/camcima/finita/graph/badge.svg)](https://codecov.io/gh/camcima/finita)
 [![npm version](https://img.shields.io/npm/v/@camcima/finita)](https://www.npmjs.com/package/@camcima/finita)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%20%7C%2020%20%7C%2022-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%20%7C%2022%20%7C%2024-green.svg)](https://nodejs.org/)
 
 </div>
 
@@ -31,9 +31,8 @@ This library is a TypeScript port of [metabor/statemachine](https://github.com/M
 - **Transition Selectors** -- pluggable strategies for resolving ambiguous transitions (score-based, weight-based)
 - **Mutex/Locking** -- concurrency control with pluggable lock adapters
 - **Factory Pattern** -- create pre-configured state machines from subject objects
-- **Process Merging** -- combine state collections with optional name prefixing
+- **ProcessBuilder** -- fluent, validated API for building frozen, immutable state graphs
 - **Graph Visualization** -- build graph data structures for rendering with GraphViz or other tools
-- **Setup Helper** -- fluent API for building state machines from configuration
 - **Zero Dependencies** -- no runtime dependencies
 
 ## Installation
@@ -53,20 +52,19 @@ stateDiagram-v2
 ```
 
 ```typescript
-import { State, Transition, Process, Statemachine } from "@camcima/finita";
+import { ProcessBuilder, Statemachine } from "@camcima/finita";
 
-// Define states
-const draft = new State("draft");
-const published = new State("published");
-const archived = new State("archived");
+// Define the process
+const process = new ProcessBuilder("article-workflow")
+  .addState("draft", { initial: true })
+  .addState("published")
+  .addState("archived")
+  .addTransition("draft", "published", { event: "publish" })
+  .addTransition("published", "archived", { event: "archive" })
+  .addTransition("archived", "draft", { event: "reopen" })
+  .build();
 
-// Define transitions
-draft.addTransition(new Transition(published, "publish"));
-published.addTransition(new Transition(archived, "archive"));
-archived.addTransition(new Transition(draft, "reopen"));
-
-// Create process and state machine
-const process = new Process("article-workflow", draft);
+// Create the state machine
 const article = { title: "Hello World" };
 const sm = new Statemachine(article, process);
 
@@ -87,9 +85,7 @@ Use the `TSubject` generic parameter for type-safe access to your domain object 
 
 ```typescript
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Statemachine,
   CallbackCondition,
 } from "@camcima/finita";
@@ -99,17 +95,21 @@ interface Order {
   total: number;
 }
 
-const pending = new State("pending");
-const approved = new State("approved");
-
 // subject is typed as Order -- no cast needed
 const canApprove = new CallbackCondition<Order>(
   "canApprove",
   (order) => order.total <= 1000,
 );
-pending.addTransition(new Transition(approved, "review", canApprove));
 
-const process = new Process("order", pending);
+const process = new ProcessBuilder<Order>("order")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", {
+    event: "review",
+    condition: canApprove,
+  })
+  .build();
+
 const sm = new Statemachine<Order>({ id: 1, total: 500 }, process);
 
 const order = sm.getSubject(); // typed as Order
@@ -148,17 +148,17 @@ classDiagram
 
 Detailed documentation for every component:
 
-- **[Core](docs/core.md)** -- State, Transition, Event, Process, Statemachine, Dispatcher, StateCollection
-- **[Conditions](docs/conditions.md)** -- Tautology, Contradiction, CallbackCondition, Timeout, AndComposite, OrComposite, Not
-- **[Observers](docs/observers.md)** -- CallbackObserver, StatefulStatusChanger, OnEnterObserver, TransitionLogger
-- **[Filters](docs/filters.md)** -- ActiveTransitionFilter, FilterStateByEvent, FilterStateByTransition, FilterStateByFinalState, FilterTransitionByEvent
-- **[Selectors](docs/selectors.md)** -- OneOrNoneActiveTransition, ScoreTransition, WeightTransition
-- **[Mutex](docs/mutex.md)** -- NullMutex, LockAdapterMutex, MutexFactory
-- **[Factory](docs/factory.md)** -- Factory, SingleProcessDetector, AbstractNamedProcessDetector, StatefulStateNameDetector
-- **[Utilities](docs/utilities.md)** -- SetupHelper, StateCollectionMerger
-- **[Graph](docs/graph.md)** -- GraphBuilder
-- **[Errors](docs/errors.md)** -- WrongEventForStateError, LockCanNotBeAcquiredError, DuplicateStateError
-- **[Interfaces](docs/interfaces.md)** -- All TypeScript interfaces
+- **[Core](https://github.com/camcima/finita/blob/main/docs/core.md)** -- State, Transition, Event, Process, Statemachine, Dispatcher, StateCollection
+- **[Conditions](https://github.com/camcima/finita/blob/main/docs/conditions.md)** -- Tautology, Contradiction, CallbackCondition, Timeout, AndComposite, OrComposite, Not
+- **[Observers](https://github.com/camcima/finita/blob/main/docs/observers.md)** -- CallbackObserver, StatefulStatusChanger, OnEnterObserver, TransitionLogger
+- **[Filters](https://github.com/camcima/finita/blob/main/docs/filters.md)** -- ActiveTransitionFilter, FilterStateByEvent, FilterStateByTransition, FilterStateByFinalState, FilterTransitionByEvent
+- **[Selectors](https://github.com/camcima/finita/blob/main/docs/selectors.md)** -- OneOrNoneActiveTransition, ScoreTransition, WeightTransition
+- **[Mutex](https://github.com/camcima/finita/blob/main/docs/mutex.md)** -- NullMutex, LockAdapterMutex, MutexFactory
+- **[Factory](https://github.com/camcima/finita/blob/main/docs/factory.md)** -- Factory, SingleProcessDetector, AbstractNamedProcessDetector, StatefulStateNameDetector
+- **[Graph](https://github.com/camcima/finita/blob/main/docs/graph.md)** -- GraphBuilder
+- **[Errors](https://github.com/camcima/finita/blob/main/docs/errors.md)** -- WrongEventForStateError, LockCanNotBeAcquiredError, DuplicateStateError, ProcessFinalizedError, GraphValidationError, DuplicateTransitionError
+- **[Interfaces](https://github.com/camcima/finita/blob/main/docs/interfaces.md)** -- All TypeScript interfaces
+- **[Migration Guide](https://github.com/camcima/finita/blob/main/docs/migration/v2-to-v3.md)** -- Upgrading from v2 to v3
 
 ## Examples
 
@@ -170,13 +170,12 @@ A complete working example (order processing with prepayment and postpayment wor
 src/
   index.ts                 # Barrel export
   MaybePromise.ts          # MaybePromise<T> = T | Promise<T> utility type
+  ProcessBuilder.ts        # Fluent builder for frozen graph construction
   Event.ts                 # Event implementation
-  State.ts                 # State implementation
-  Transition.ts            # Transition implementation
-  StateCollection.ts       # Named collection of states
-  Process.ts               # Process (workflow definition)
+  State.ts                 # State implementation (frozen; use ProcessBuilder)
+  Transition.ts            # Transition implementation (frozen; use ProcessBuilder)
+  Process.ts               # Process (workflow definition; use ProcessBuilder)
   Statemachine.ts          # Runtime state machine
-  Dispatcher.ts            # Deferred event dispatcher
   interfaces/              # All TypeScript interfaces
   condition/               # Condition (guard) implementations
   observer/                # Observer implementations
@@ -184,7 +183,7 @@ src/
   selector/                # Transition selection strategies
   mutex/                   # Locking implementations
   factory/                 # State machine factory pattern
-  util/                    # SetupHelper, StateCollectionMerger
+  internal/                # Internal helpers (OperationQueue, InternalConstruction)
   graph/                   # Graph visualization builder
   error/                   # Custom error classes
 ```

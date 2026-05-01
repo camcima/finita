@@ -66,6 +66,7 @@ export interface MermaidOptions {
 export class GraphBuilder {
   private readonly nodes: Map<string, GraphNode> = new Map();
   private readonly edges: GraphEdge[] = [];
+  private readonly statesWithEdges: Set<string> = new Set();
 
   private getOrCreateNode(state: StateInterface): GraphNode {
     const name = state.getName();
@@ -104,6 +105,9 @@ export class GraphBuilder {
 
   addState(state: StateInterface): void {
     this.getOrCreateNode(state);
+    const name = state.getName();
+    if (this.statesWithEdges.has(name)) return;
+    this.statesWithEdges.add(name);
     for (const transition of state.getTransitions()) {
       const sourceNode = this.getOrCreateNode(state);
       const targetNode = this.getOrCreateNode(transition.getTargetState());

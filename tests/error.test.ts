@@ -3,8 +3,10 @@ import {
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   DuplicateStateError,
-  State,
-  StateCollection,
+  ProcessFinalizedError,
+  GraphValidationError,
+  DuplicateTransitionError,
+  ProcessBuilder,
 } from "../src/index.js";
 
 describe("WrongEventForStateError (PHP-ported)", () => {
@@ -45,18 +47,60 @@ describe("DuplicateStateError", () => {
     expect(error.name).toBe("DuplicateStateError");
   });
 
-  it("should be thrown by StateCollection.addState on duplicate name", () => {
-    const collection = new StateCollection();
-    collection.addState(new State("s1"));
-    expect(() => collection.addState(new State("s1"))).toThrow(
+  it("should be thrown by ProcessBuilder.addState on duplicate name", () => {
+    expect(() => new ProcessBuilder("p").addState("s1").addState("s1")).toThrow(
       DuplicateStateError,
     );
   });
 
-  it("should allow re-adding the same instance", () => {
-    const collection = new StateCollection();
-    const s1 = new State("s1");
-    collection.addState(s1);
-    expect(() => collection.addState(s1)).not.toThrow();
+  it("should include the duplicate state name in the error message", () => {
+    try {
+      new ProcessBuilder("p").addState("s1").addState("s1");
+    } catch (err) {
+      expect((err as DuplicateStateError).stateName).toBe("s1");
+    }
+  });
+});
+
+describe("ProcessFinalizedError", () => {
+  it("captures the builder name and is an Error", () => {
+    const err = new ProcessFinalizedError("orderFulfillment");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("ProcessFinalizedError");
+    expect(err.processName).toBe("orderFulfillment");
+    expect(err.message).toContain("orderFulfillment");
+  });
+});
+
+describe("GraphValidationError", () => {
+  it("captures violation details", () => {
+    const err = new GraphValidationError(
+      "unknownTarget",
+      `Transition target "x" was not declared as a state`,
+      { fromState: "a", toState: "x" },
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("GraphValidationError");
+    expect(err.code).toBe("unknownTarget");
+    expect(err.message).toContain("unknownTarget");
+    expect(err.message).toContain('"x"');
+    expect(err.details).toEqual({ fromState: "a", toState: "x" });
+  });
+});
+
+describe("DuplicateTransitionError", () => {
+  it("captures conflict descriptors", () => {
+    const err = new DuplicateTransitionError({
+      fromState: "draft",
+      toState: "submitted",
+      eventName: "submit",
+      existingConditionName: "hasItems",
+      newConditionName: "isAuthorised",
+    });
+    expect(err.name).toBe("DuplicateTransitionError");
+    expect(err.message).toContain("draft");
+    expect(err.message).toContain("submit");
+    expect(err.message).toContain("hasItems");
+    expect(err.message).toContain("isAuthorised");
   });
 });

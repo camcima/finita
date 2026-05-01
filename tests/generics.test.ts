@@ -1,8 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  State,
-  Transition,
-  Process,
+  ProcessBuilder,
   Statemachine,
   CallbackCondition,
   AndComposite,
@@ -31,20 +29,25 @@ interface Order {
 
 describe("Generics - typed subject", () => {
   function buildOrderProcess() {
-    const pending = new State("pending");
-    const approved = new State("approved");
-    const rejected = new State("rejected");
-
     const approveCondition = new CallbackCondition<Order>(
       "canApprove",
       (order) => order.total <= 1000,
     );
     const rejectCondition = new Not<Order>(approveCondition);
 
-    pending.addTransition(new Transition(approved, "review", approveCondition));
-    pending.addTransition(new Transition(rejected, "review", rejectCondition));
-
-    return new Process("order", pending);
+    return new ProcessBuilder<Order>("order")
+      .addState("pending", { initial: true })
+      .addState("approved")
+      .addState("rejected")
+      .addTransition("pending", "approved", {
+        event: "review",
+        condition: approveCondition,
+      })
+      .addTransition("pending", "rejected", {
+        event: "review",
+        condition: rejectCondition,
+      })
+      .build();
   }
 
   it("should create typed statemachine with typed subject access", () => {
@@ -124,10 +127,11 @@ describe("Generics - typed subject", () => {
   });
 
   it("should work with typed factory", async () => {
-    const pending = new State("pending");
-    const approved = new State("approved");
-    pending.addTransition(new Transition(approved, "approve"));
-    const process = new Process("order", pending);
+    const process = new ProcessBuilder<Order>("order")
+      .addState("pending", { initial: true })
+      .addState("approved")
+      .addTransition("pending", "approved", { event: "approve" })
+      .build();
 
     const factory = new Factory<Order>(
       new SingleProcessDetector<Order>(process),
@@ -175,8 +179,9 @@ describe("Generics - typed subject", () => {
 
 describe("Generics - backward compatibility", () => {
   it("should work without explicit type parameter (defaults to unknown)", () => {
-    const state = new State("s1");
-    const process = new Process("test", state);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
     const sm = new Statemachine({}, process);
     expect(sm.getCurrentState().getName()).toBe("s1");
   });
@@ -187,8 +192,9 @@ describe("Generics - backward compatibility", () => {
   });
 
   it("should allow untyped Factory", async () => {
-    const state = new State("s1");
-    const process = new Process("test", state);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .build();
     const factory = new Factory(new SingleProcessDetector(process));
     const sm = await factory.createStatemachine({});
     expect(sm.getCurrentState().getName()).toBe("s1");
@@ -201,11 +207,14 @@ describe("Generics - type assignability", () => {
       "test",
       (order) => order.total > 0,
     );
-    const transition: TransitionInterface<Order> = new Transition<Order>(
-      new State("s1"),
-      "go",
-      condition,
-    );
+    const process = new ProcessBuilder<Order>("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go", condition })
+      .build();
+    const transition: TransitionInterface<Order> = Array.from(
+      process.getState("s1").getTransitions(),
+    )[0]!;
     expect(transition.getConditionName()).toBe("test");
   });
 

@@ -1,4 +1,7 @@
-export class WrongEventForStateError extends Error {
+import { FinitaError } from "./FinitaError.js";
+
+export class WrongEventForStateError extends FinitaError {
+  readonly code = "wrongEventForState";
   readonly stateName: string;
   readonly eventName: string;
 

@@ -1,4 +1,7 @@
-export class DuplicateStateError extends Error {
+import { FinitaError } from "./FinitaError.js";
+
+export class DuplicateStateError extends FinitaError {
+  readonly code = "duplicateState";
   readonly stateName: string;
 
   constructor(stateName: string) {

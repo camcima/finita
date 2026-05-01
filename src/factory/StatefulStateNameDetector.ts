@@ -1,5 +1,6 @@
 import type { StateNameDetectorInterface } from "../interfaces/StateNameDetectorInterface.js";
 import type { StatefulInterface } from "../interfaces/StatefulInterface.js";
+import { InvalidSubjectError } from "../error/InvalidSubjectError.js";
 
 function isStateful(obj: unknown): obj is StatefulInterface {
   return (
@@ -15,6 +16,6 @@ export class StatefulStateNameDetector implements StateNameDetectorInterface<Sta
     if (isStateful(subject)) {
       return subject.getCurrentStateName();
     }
-    throw new Error("Subject has to implement the StatefulInterface!");
+    throw new InvalidSubjectError("StatefulInterface", ["getCurrentStateName"]);
   }
 }

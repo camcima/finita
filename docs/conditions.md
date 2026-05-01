@@ -19,22 +19,43 @@ interface ConditionInterface<TSubject = unknown> extends Named {
 
 The `subject` is the domain object managed by the state machine. The `context` is a `Map<string, unknown>` passed when triggering events or checking transitions.
 
-## Condition Name as Identity
+## Condition Identity for Deduplication
 
-A condition's `getName()` value serves as its **semantic identity**, not just a display label. Two transitions that share the same target state, event name, and condition name are considered duplicates — even if they reference different condition objects with different logic.
+`ProcessBuilder` deduplicates transitions by `(fromState, event, toState, condition reference)`. Two declarations with the same `(fromState, event, toState)` triple and the **same condition object reference** are silently merged — declaring the same transition twice is idempotent. Two declarations sharing the same triple but referring to **different condition objects** throw `DuplicateTransitionError` at build time, regardless of whether the conditions share a `getName()` value.
 
-This means:
+The library cannot introspect a callable's body to compare logic, so different object identity is treated as different logic.
 
 ```typescript
-const c1 = new CallbackCondition("isReady", () => checkDatabase());
-const c2 = new CallbackCondition("isReady", () => checkCache());
+import {
+  ProcessBuilder,
+  CallbackCondition,
+  DuplicateTransitionError,
+} from "@camcima/finita";
 
-// These are treated as the same transition — c2 is silently ignored
-state.addTransition(new Transition(target, "go", c1));
-state.addTransition(new Transition(target, "go", c2));
+const checkReady = new CallbackCondition("isReady", () => checkDatabase());
+
+// Same reference declared twice → silently dedup'd, one transition built.
+new ProcessBuilder("idempotent")
+  .addState("source", { initial: true })
+  .addState("target")
+  .addTransition("source", "target", { event: "go", condition: checkReady })
+  .addTransition("source", "target", { event: "go", condition: checkReady })
+  .build();
+
+// Different references with the same name → conflict, throws at build time.
+const a = new CallbackCondition("isReady", () => checkDatabase());
+const b = new CallbackCondition("isReady", () => checkCache());
+expect(() =>
+  new ProcessBuilder("conflicting")
+    .addState("source", { initial: true })
+    .addState("target")
+    .addTransition("source", "target", { event: "go", condition: a })
+    .addTransition("source", "target", { event: "go", condition: b })
+    .build(),
+).toThrow(DuplicateTransitionError);
 ```
 
-**Give each distinct condition a unique name.** If two conditions do different things, they must have different names. The name is how the library distinguishes them during transition deduplication, graph export, and setup helpers.
+**Reuse the same condition instance when you mean the same condition.** Construct it once and pass the same reference to every `addTransition` that should share it. The `getName()` value is used for graph labels and error messages, not for deduplication.
 
 ## Overview
 
@@ -90,14 +111,16 @@ new Tautology(name?: string)
 ### Example
 
 ```typescript
-import { Tautology, Transition, State } from "@camcima/finita";
+import { Tautology, ProcessBuilder } from "@camcima/finita";
 
 const always = new Tautology("always proceed");
-const s1 = new State("s1");
-const s2 = new State("s2");
 
-// Automatic transition that always fires
-s1.addTransition(new Transition(s2, null, always));
+const process = new ProcessBuilder("example")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  // Automatic transition that always fires
+  .addTransition("s1", "s2", { condition: always })
+  .build();
 ```
 
 ---
@@ -121,14 +144,16 @@ new Contradiction(name?: string)
 ### Example
 
 ```typescript
-import { Contradiction, Transition, State } from "@camcima/finita";
+import { Contradiction, ProcessBuilder } from "@camcima/finita";
 
 const never = new Contradiction("blocked");
-const s1 = new State("s1");
-const s2 = new State("s2");
 
-// This transition can never fire
-s1.addTransition(new Transition(s2, "go", never));
+const process = new ProcessBuilder("example")
+  .addState("s1", { initial: true })
+  .addState("s2")
+  // This transition can never fire
+  .addTransition("s1", "s2", { event: "go", condition: never })
+  .build();
 ```
 
 ---
@@ -145,10 +170,10 @@ Wraps a function as a condition. This is the most common way to create custom gu
 new CallbackCondition<TSubject = unknown>(name: string, callable: ConditionCallbackFn<TSubject>)
 ```
 
-| Parameter  | Type                                                                          | Description                                                              |
-| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `name`     | `string`                                                                      | The condition name (used as identity for deduplication and graph labels) |
-| `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                                       |
+| Parameter  | Type                                                                          | Description                                                   |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `name`     | `string`                                                                      | The condition name (used for graph labels and error messages) |
+| `callable` | `(subject: TSubject, context: Map<string, unknown>) => MaybePromise<boolean>` | The guard function                                            |
 
 ### Example
 
@@ -175,7 +200,14 @@ const hasPriority = new CallbackCondition(
 );
 
 // Use in transitions
-pending.addTransition(new Transition(approved, "submit", isApproved));
+const process = new ProcessBuilder("example")
+  .addState("pending", { initial: true })
+  .addState("approved")
+  .addTransition("pending", "approved", {
+    event: "submit",
+    condition: isApproved,
+  })
+  .build();
 ```
 
 ### Type: `ConditionCallbackFn`
@@ -339,7 +371,7 @@ new Not<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 ### Example
 
 ```typescript
-import { Not, CallbackCondition, Transition, State } from "@camcima/finita";
+import { Not, CallbackCondition, ProcessBuilder } from "@camcima/finita";
 
 const isExpired = new CallbackCondition("isExpired", (s) => (s as any).expired);
 const isNotExpired = new Not(isExpired);
@@ -347,7 +379,14 @@ const isNotExpired = new Not(isExpired);
 console.log(isNotExpired.getName()); // 'not ( isExpired )'
 
 // Use for conditional transitions
-active.addTransition(new Transition(renewed, "renew", isNotExpired));
+const process = new ProcessBuilder("example")
+  .addState("active", { initial: true })
+  .addState("renewed")
+  .addTransition("active", "renewed", {
+    event: "renew",
+    condition: isNotExpired,
+  })
+  .build();
 ```
 
 ---
@@ -384,7 +423,14 @@ class MinimumBalance implements ConditionInterface<Account> {
 
 // Usage
 const canWithdraw = new MinimumBalance(100);
-active.addTransition(new Transition(withdrawn, "withdraw", canWithdraw));
+const process = new ProcessBuilder("account")
+  .addState("active", { initial: true })
+  .addState("withdrawn")
+  .addTransition("active", "withdrawn", {
+    event: "withdraw",
+    condition: canWithdraw,
+  })
+  .build();
 ```
 
 ### Composing Conditions

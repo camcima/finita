@@ -1,16 +1,52 @@
 import type { StateInterface } from "./interfaces/StateInterface.js";
 import type { TransitionInterface } from "./interfaces/TransitionInterface.js";
 import type { EventInterface } from "./interfaces/EventInterface.js";
+import type { InternalConstructionKey } from "./internal/InternalConstruction.js";
+import { INTERNAL_CONSTRUCTION_KEY } from "./internal/InternalConstruction.js";
 import { Event } from "./Event.js";
+import { StateEventNotFoundError } from "./error/StateEventNotFoundError.js";
 
 export class State implements StateInterface {
   private readonly name: string;
-  private readonly transitions: Set<TransitionInterface> = new Set();
-  private readonly events: Map<string, EventInterface> = new Map();
-  private readonly metadata: Map<string, unknown> = new Map();
+  private _transitions: ReadonlySet<TransitionInterface> | null = null;
+  private readonly events: ReadonlyMap<string, EventInterface>;
+  private readonly metadata: ReadonlyMap<string, unknown>;
 
-  constructor(name: string) {
+  constructor(
+    key: InternalConstructionKey,
+    name: string,
+    eventNames: Iterable<string>,
+    metadata: ReadonlyMap<string, unknown>,
+  ) {
+    if (key !== INTERNAL_CONSTRUCTION_KEY) {
+      throw new Error("State is not user-constructible; use ProcessBuilder.");
+    }
     this.name = name;
+    const events = new Map<string, EventInterface>();
+    for (const en of eventNames) {
+      events.set(en, new Event(en));
+    }
+    this.events = events;
+    this.metadata = new Map(metadata);
+  }
+
+  /**
+   * Internal: populate transitions after State construction.
+   * May only be called once and only with the construction key.
+   * Used by ProcessBuilder to break the cycle: State must exist before
+   * Transitions can target it, but State needs its transitions to be useful.
+   */
+  _initTransitions(
+    key: InternalConstructionKey,
+    transitions: Iterable<TransitionInterface>,
+  ): void {
+    if (key !== INTERNAL_CONSTRUCTION_KEY) {
+      throw new Error("_initTransitions is internal");
+    }
+    if (this._transitions !== null) {
+      throw new Error(`State "${this.name}" transitions already set`);
+    }
+    this._transitions = new Set(transitions);
   }
 
   getName(): string {
@@ -18,29 +54,10 @@ export class State implements StateInterface {
   }
 
   getTransitions(): Iterable<TransitionInterface> {
-    return this.transitions;
-  }
-
-  addTransition(transition: TransitionInterface): void {
-    if (this.transitions.has(transition)) {
-      return;
+    if (this._transitions === null) {
+      return [];
     }
-    const targetName = transition.getTargetState().getName();
-    const eventName = transition.getEventName();
-    const conditionName = transition.getConditionName();
-    for (const existing of this.transitions) {
-      if (
-        existing.getTargetState().getName() === targetName &&
-        existing.getEventName() === eventName &&
-        existing.getConditionName() === conditionName
-      ) {
-        return;
-      }
-    }
-    this.transitions.add(transition);
-    if (eventName) {
-      this.getEvent(eventName);
-    }
+    return this._transitions;
   }
 
   getEventNames(): string[] {
@@ -52,10 +69,9 @@ export class State implements StateInterface {
   }
 
   getEvent(name: string): EventInterface {
-    let event = this.events.get(name);
+    const event = this.events.get(name);
     if (!event) {
-      event = new Event(name);
-      this.events.set(name, event);
+      throw new StateEventNotFoundError(this.name, name);
     }
     return event;
   }
@@ -68,15 +84,7 @@ export class State implements StateInterface {
     return this.metadata.get(key);
   }
 
-  setMetadataValue(key: string, value: unknown): void {
-    this.metadata.set(key, value);
-  }
-
   hasMetadataValue(key: string): boolean {
     return this.metadata.has(key);
-  }
-
-  deleteMetadataValue(key: string): void {
-    this.metadata.delete(key);
   }
 }

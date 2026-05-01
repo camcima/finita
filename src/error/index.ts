@@ -1,3 +1,15 @@
+export { FinitaError } from "./FinitaError.js";
 export { WrongEventForStateError } from "./WrongEventForStateError.js";
 export { LockCanNotBeAcquiredError } from "./LockCanNotBeAcquiredError.js";
 export { DuplicateStateError } from "./DuplicateStateError.js";
+export { ProcessFinalizedError } from "./ProcessFinalizedError.js";
+export { GraphValidationError } from "./GraphValidationError.js";
+export { DuplicateTransitionError } from "./DuplicateTransitionError.js";
+export { StateNotFoundError } from "./StateNotFoundError.js";
+export { StateEventNotFoundError } from "./StateEventNotFoundError.js";
+export { ProcessNotFoundError } from "./ProcessNotFoundError.js";
+export { InvalidSubjectError } from "./InvalidSubjectError.js";
+export { AmbiguousTransitionError } from "./AmbiguousTransitionError.js";
+export { AutomaticTransitionCycleError } from "./AutomaticTransitionCycleError.js";
+export type { GraphValidationCode } from "./GraphValidationError.js";
+export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";

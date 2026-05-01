@@ -1,12 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  State,
-  Transition,
-  Process,
   Event,
   Statemachine,
-  StateCollection,
-  SetupHelper,
+  ProcessBuilder,
   CallbackObserver,
   StatefulStatusChanger,
   OnEnterObserver,
@@ -31,61 +27,75 @@ describe("StatefulStatusChanger", () => {
       getCurrentStateName: () => "closed",
       setCurrentStateName: vi.fn(),
     };
-    const closed = new State("closed");
-    const opened = new State("opened");
-    closed.addTransition(new Transition(opened, "open"));
-    opened.addTransition(new Transition(closed, "close"));
-    const process = new Process("door", closed);
+    const process = new ProcessBuilder("door")
+      .addState("closed", { initial: true })
+      .addState("opened")
+      .addTransition("closed", "opened", { event: "open" })
+      .addTransition("opened", "closed", { event: "close" })
+      .build();
     const sm = new Statemachine(subject, process);
-    sm.attach(new StatefulStatusChanger());
+    sm.attachAfter(new StatefulStatusChanger(subject));
     await sm.triggerEvent("open");
     expect(subject.setCurrentStateName).toHaveBeenCalledWith("opened");
   });
 });
 
 describe("OnEnterObserver", () => {
-  it("should trigger onEnter event when entering a state", async () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
+  it("should enqueue and eventually fire the onEnter event", async () => {
+    // In v3, OnEnterObserver enqueues triggerEvent("onEnter") as a separate op.
+    // The chained op runs after the current runIfIdle call settles — a brief
+    // microtask yield lets the event loop drain the queue.
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addState("s3")
+      .addTransition("s1", "s2", { event: "go" })
+      .addTransition("s2", "s3", { event: "onEnter" })
+      .build();
 
     const fn = vi.fn();
-    // Create an onEnter event on s2 with a self-transition
-    s2.addTransition(new Transition(s2, "onEnter"));
-    s2.getEvent("onEnter").attach(new CallbackObserver(fn));
+    process.getState("s2").getEvent("onEnter").attach(new CallbackObserver(fn));
 
-    const process = new Process("test", s1);
     const sm = new Statemachine({}, process);
-    sm.attach(new OnEnterObserver());
+    sm.attachAfter(new OnEnterObserver());
     await sm.triggerEvent("go");
+    // Yield to allow the enqueued chained op to run.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(sm.getCurrentState().getName()).toBe("s3");
     expect(fn).toHaveBeenCalled();
   });
 
   it("should not trigger if state has no onEnter event", async () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    const process = new Process("test", s1);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
     const sm = new Statemachine({}, process);
-    sm.attach(new OnEnterObserver());
+    sm.attachAfter(new OnEnterObserver());
     // Should not throw
     await sm.triggerEvent("go");
     expect(sm.getCurrentState().getName()).toBe("s2");
   });
 
   it("should support custom event name", async () => {
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addState("s3")
+      .addTransition("s1", "s2", { event: "go" })
+      .addTransition("s2", "s3", { event: "myEnter" })
+      .build();
 
     const fn = vi.fn();
-    s2.addTransition(new Transition(s2, "myEnter"));
-    s2.getEvent("myEnter").attach(new CallbackObserver(fn));
+    process.getState("s2").getEvent("myEnter").attach(new CallbackObserver(fn));
 
-    const process = new Process("test", s1);
     const sm = new Statemachine({}, process);
-    sm.attach(new OnEnterObserver("myEnter"));
+    sm.attachAfter(new OnEnterObserver("myEnter"));
     await sm.triggerEvent("go");
+    // Yield to allow the enqueued chained op to run.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(sm.getCurrentState().getName()).toBe("s3");
     expect(fn).toHaveBeenCalled();
   });
 });
@@ -93,12 +103,13 @@ describe("OnEnterObserver", () => {
 describe("TransitionLogger", () => {
   it("should log transitions", async () => {
     const logger: LoggerInterface = { log: vi.fn() };
-    const s1 = new State("s1");
-    const s2 = new State("s2");
-    s1.addTransition(new Transition(s2, "go"));
-    const process = new Process("test", s1);
+    const process = new ProcessBuilder("test")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
     const sm = new Statemachine({}, process);
-    sm.attach(new TransitionLogger(logger));
+    sm.attachAfter(new TransitionLogger(logger));
     await sm.triggerEvent("go");
     expect(logger.log).toHaveBeenCalled();
     const [level, message] = (logger.log as ReturnType<typeof vi.fn>).mock
@@ -112,10 +123,7 @@ describe("TransitionLogger", () => {
 // === PHP-ported tests ===
 
 describe("StatefulStatusChanger (PHP-ported)", () => {
-  it("should change status on stateful objects via direct update", () => {
-    const stateName = "stateName";
-    const state = new State(stateName);
-    const process = new Process("process", state);
+  it("should change status on stateful objects via after-transition observer", async () => {
     let currentStateName = "";
     const subject: StatefulInterface = {
       getCurrentStateName: () => currentStateName,
@@ -123,51 +131,74 @@ describe("StatefulStatusChanger (PHP-ported)", () => {
         currentStateName = name;
       },
     };
+    // Build a process with one state so we can trigger a checkTransitions
+    // that has no eligible automatic transition — just verify the observer
+    // can be attached and notify is wired up correctly.
+    const process = new ProcessBuilder("process")
+      .addState("stateName", { initial: true })
+      .addState("other")
+      .addTransition("stateName", "other", { event: "go" })
+      .build();
     const sm = new Statemachine(subject, process);
-    const observer = new StatefulStatusChanger();
-    observer.update(sm);
-    expect(currentStateName).toBe(stateName);
+    sm.attachAfter(new StatefulStatusChanger(subject));
+    await sm.triggerEvent("go");
+    expect(currentStateName).toBe("other");
   });
 });
 
 describe("OnEnterObserver (PHP-ported)", () => {
-  it("should trigger event if state is changed and new state has registered event (using SetupHelper)", async () => {
-    const collection = new StateCollection();
-    const helper = new SetupHelper(collection);
-    helper.findOrCreateTransition("initial", "second", "go");
-    helper.findOrCreateTransition("second", "error", "error");
+  it("should trigger event if state is changed and new state has registered event", async () => {
     const eventName = "eventName";
-    helper.findOrCreateTransition("second", "final", eventName);
-    const process = new Process("process_name", collection.getState("initial"));
+    const process = new ProcessBuilder("process_name")
+      .addState("initial", { initial: true })
+      .addState("second")
+      .addState("final")
+      .addState("error")
+      .addTransition("initial", "second", { event: "go" })
+      .addTransition("second", "error", { event: "error" })
+      .addTransition("second", "final", { event: eventName })
+      .build();
 
     const subject = {};
     const sm = new Statemachine(subject, process);
-    sm.attach(new OnEnterObserver(eventName));
+    sm.attachAfter(new OnEnterObserver(eventName));
     await sm.triggerEvent("go");
+    // Yield to allow the enqueued chained op (eventName → final) to run.
+    await new Promise<void>((r) => setTimeout(r, 0));
 
     expect(sm.getCurrentState().getName()).toBe("final");
   });
 });
 
 describe("TransitionLogger (PHP-ported)", () => {
-  it("should log with named subject, exact message format and context", () => {
-    const subject = { getName: () => "SubjectName" };
-    const state = new State("stateName");
-    const process = new Process("process", state);
-    const sm = new Statemachine(subject, process);
+  it("should log with from/to state names and transition info", async () => {
+    const process = new ProcessBuilder("process")
+      .addState("stateName", { initial: true })
+      .addState("other")
+      .addTransition("stateName", "other", { event: "go" })
+      .build();
+    // In v3, TransitionLogger reads from the frame (no subject field in log context).
+    const sm = new Statemachine({}, process);
 
     const logger: LoggerInterface = { log: vi.fn() };
-    const observer = new TransitionLogger(logger);
-    observer.update(sm);
+    sm.attachAfter(new TransitionLogger(logger));
+    await sm.triggerEvent("go");
 
     expect(logger.log).toHaveBeenCalledTimes(1);
     const [level, message, context] = (logger.log as ReturnType<typeof vi.fn>)
       .mock.calls[0];
     expect(level).toBe("info");
-    expect(message).toBe('Transition for "SubjectName" to "stateName"');
-    expect(context).toHaveProperty("subject", subject);
-    expect(context).toHaveProperty("currentState", state);
-    expect(context).toHaveProperty("lastState", null);
-    expect(context).toHaveProperty("transition", null);
+    // v3 message format: 'Transition from "stateName" to "other" with event "go"'
+    expect(message).toContain("Transition");
+    expect(message).toContain("stateName");
+    expect(message).toContain("other");
+    // v3 frame-based context: fromState, toState, event, transition, machineName
+    expect(context).toHaveProperty("fromState");
+    expect(context).toHaveProperty("toState");
+    expect(context).toHaveProperty("transition");
+    // v3 does NOT include a "subject" field — subject identity is not on the frame
+    expect(context).not.toHaveProperty("subject");
+    expect(context).not.toHaveProperty("currentState");
+    expect(context).not.toHaveProperty("lastState");
   });
 });

@@ -1,40 +1,32 @@
-import type { Observer, ObservableSubject } from "../interfaces/Observer.js";
-import type { StatemachineInterface } from "../interfaces/StatemachineInterface.js";
+import type {
+  AfterTransitionObserver,
+  EnqueueContext,
+} from "../interfaces/AfterTransitionObserverInterface.js";
+import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js";
 
-function isStatemachine(obj: unknown): obj is StatemachineInterface {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "getCurrentState" in obj &&
-    "triggerEvent" in obj
-  );
-}
-
-export class OnEnterObserver implements Observer {
+/**
+ * After-transition observer that fires an event named DEFAULT_EVENT_NAME
+ * (or a custom name) when entering any state that has that event declared.
+ *
+ * The chained event is *enqueued*, not invoked inline: it runs as its own
+ * top-level operation after the current operation completes. Other
+ * after-observers registered after OnEnterObserver still see the original
+ * frame, not the chained one.
+ */
+export class OnEnterObserver<
+  TSubject = unknown,
+> implements AfterTransitionObserver<TSubject> {
   static readonly DEFAULT_EVENT_NAME = "onEnter";
 
   private readonly eventName: string;
 
-  constructor(eventName = OnEnterObserver.DEFAULT_EVENT_NAME) {
+  constructor(eventName: string = OnEnterObserver.DEFAULT_EVENT_NAME) {
     this.eventName = eventName;
   }
 
-  async update(subject: ObservableSubject): Promise<void> {
-    if (
-      isStatemachine(subject) &&
-      subject.getCurrentState().hasEvent(this.eventName)
-    ) {
-      const sm = subject as StatemachineInterface;
-      const autorelease = sm.isAutoreleaseLock();
-      sm.setAutoreleaseLock(false);
-      try {
-        await sm.triggerEvent(
-          this.eventName,
-          sm.getCurrentContext() ?? undefined,
-        );
-      } finally {
-        sm.setAutoreleaseLock(autorelease);
-      }
+  notify(frame: TransitionFrame<TSubject>, ctx: EnqueueContext): void {
+    if (frame.toState.hasEvent(this.eventName)) {
+      ctx.enqueue(this.eventName, new Map(frame.context));
     }
   }
 }

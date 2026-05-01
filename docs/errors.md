@@ -4,10 +4,19 @@ Custom error classes thrown by the state machine.
 
 ## Table of Contents
 
+- [FinitaError](#finitaerror)
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
 - [DuplicateStateError](#duplicatestateerror)
-- [Automatic Transition Cycle Error](#automatic-transition-cycle-error)
+- [ProcessFinalizedError](#processfinalizederror)
+- [GraphValidationError](#graphvalidationerror)
+- [DuplicateTransitionError](#duplicatetransitionerror)
+- [StateNotFoundError](#statenotfounderror)
+- [StateEventNotFoundError](#stateeventnotfounderror)
+- [ProcessNotFoundError](#processnotfounderror)
+- [InvalidSubjectError](#invalidsubjecterror)
+- [AmbiguousTransitionError](#ambiguoustransitionerror)
+- [AutomaticTransitionCycleError](#automatictransitioncycleerror)
 
 ---
 
@@ -116,13 +125,12 @@ Thrown when a `StateCollection` or `Process` constructor encounters a different 
 ### Example
 
 ```typescript
-import { DuplicateStateError, State, StateCollection } from "@camcima/finita";
-
-const collection = new StateCollection();
-collection.addState(new State("open"));
+import { DuplicateStateError, ProcessBuilder } from "@camcima/finita";
 
 try {
-  collection.addState(new State("open")); // Different instance, same name
+  new ProcessBuilder("example")
+    .addState("open", { initial: true })
+    .addState("open"); // Duplicate name — throws
 } catch (error) {
   if (error instanceof DuplicateStateError) {
     console.log(`Duplicate state: "${error.stateName}"`);
@@ -132,44 +140,285 @@ try {
 
 ### When It's Thrown
 
-- `StateCollection.addState()` is called with a state whose name matches an existing state (different instance)
-- `Process` constructor discovers two different state instances with the same name while walking transitions
-- Re-adding the **same instance** is allowed (idempotent)
+- `ProcessBuilder.addState()` is called with a name that was already declared
 
 ---
 
-## Automatic Transition Cycle Error
+## ProcessFinalizedError
 
-Thrown when automatic transitions (no event name) form a cycle. This includes self-transitions (s1 → s1) and multi-state cycles (s1 → s2 → s1, s1 → s2 → s3 → s1, etc.). Without detection, these would cause infinite recursion since conditions would be re-evaluated immediately and the loop would never terminate.
+**Import:** `import { ProcessFinalizedError } from '@camcima/finita'`
 
-### Message
+Thrown when `ProcessBuilder.build()` is called more than once on the same builder instance. A builder is single-use: once `build()` succeeds, the builder is finalized and all further mutations or build calls are rejected.
 
-```
-Automatic transition cycle detected: state "{stateName}" was already visited — this would cause infinite recursion
-```
+### Properties
 
-This error is wrapped by the state machine's transition error handler, so the outer error message will be:
+| Property      | Type     | Description                                              |
+| ------------- | -------- | -------------------------------------------------------- |
+| `processName` | `string` | The name of the finalized process                        |
+| `message`     | `string` | Contains the process name and a description of the error |
+| `name`        | `string` | `'ProcessFinalizedError'`                                |
 
-```
-Exception was thrown when doing a transition from current state "{stateName}"
-```
-
-with the cycle error available via `error.cause` (possibly nested multiple levels for multi-state cycles).
-
-### When It's Thrown
-
-When `checkTransitions()` or `triggerEvent()` follows a chain of automatic transitions and encounters a state that was already visited in the current chain.
-
-### How to Fix
-
-Break the cycle by using event-based transitions for at least one edge:
+### Example
 
 ```typescript
-// BAD: automatic cycle — will throw
-s1.addTransition(new Transition(s2, null, condition));
-s2.addTransition(new Transition(s1, null, condition));
+import { ProcessBuilder, ProcessFinalizedError } from "@camcima/finita";
 
-// GOOD: use an event to break the cycle
-s1.addTransition(new Transition(s2, null, condition));
-s2.addTransition(new Transition(s1, "retry", condition));
+const builder = new ProcessBuilder("workflow")
+  .addState("start", { initial: true })
+  .addState("end")
+  .addTransition("start", "end", { event: "finish" });
+
+const process = builder.build(); // OK
+
+try {
+  builder.build(); // Throws — builder already finalized
+} catch (error) {
+  if (error instanceof ProcessFinalizedError) {
+    console.log(`Builder for "${error.processName}" was already used`);
+  }
+}
 ```
+
+---
+
+## GraphValidationError
+
+**Import:** `import { GraphValidationError } from '@camcima/finita'`
+
+Thrown by `ProcessBuilder.build()` when the declared graph has a structural problem. The `code` property identifies the specific violation.
+
+### Properties
+
+| Property  | Type                      | Description                                            |
+| --------- | ------------------------- | ------------------------------------------------------ |
+| `code`    | `GraphValidationCode`     | A machine-readable code identifying the violation type |
+| `details` | `Record<string, unknown>` | Additional context (state names, etc.)                 |
+| `message` | `string`                  | Human-readable description including the code          |
+| `name`    | `string`                  | `'GraphValidationError'`                               |
+
+### `GraphValidationCode` values
+
+| Code                    | When                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `missingInitialState`   | No state was declared with `{ initial: true }`                                             |
+| `multipleInitialStates` | More than one state declared with `{ initial: true }`                                      |
+| `unknownTarget`         | A transition's `toState` name was never passed to `addState`                               |
+| `unknownSource`         | A transition's `fromState` name was never passed to `addState`                             |
+| `invalidEventName`      | `addTransition` was called with an empty, whitespace-only, or whitespace-padded event name |
+| `invalidConditionName`  | `addTransition` was called with a condition whose `getName()` returns empty/whitespace     |
+| `orphanState`           | Unreachable state found (only when `strictOrphans: true`)                                  |
+
+### Example
+
+```typescript
+import { ProcessBuilder, GraphValidationError } from "@camcima/finita";
+
+try {
+  new ProcessBuilder("bad")
+    .addState("start", { initial: true })
+    .addTransition("start", "nonexistent", { event: "go" }) // unknown target
+    .build();
+} catch (error) {
+  if (error instanceof GraphValidationError) {
+    console.log(error.code); // 'unknownTarget'
+    console.log(error.details); // { fromState: 'start', toState: 'nonexistent', eventName: 'go' }
+  }
+}
+```
+
+---
+
+## DuplicateTransitionError
+
+**Import:** `import { DuplicateTransitionError } from '@camcima/finita'`
+
+Thrown by `ProcessBuilder.build()` when two `addTransition` calls describe the same `(fromState, event, toState)` triple but reference **different condition object instances**, regardless of whether the conditions share a `getName()` value. Declaring the same transition twice with the **same condition reference** is silently deduplicated (idempotent re-declaration); declaring it with two different references is treated as conflicting logic, since the library cannot introspect callable bodies to compare them. See [Condition Identity for Deduplication](conditions.md#condition-identity-for-deduplication) for the rationale.
+
+### Properties
+
+| Property   | Type                          | Description                                    |
+| ---------- | ----------------------------- | ---------------------------------------------- |
+| `conflict` | `DuplicateTransitionConflict` | Object describing the conflicting declarations |
+| `message`  | `string`                      | Human-readable description of the conflict     |
+| `name`     | `string`                      | `'DuplicateTransitionError'`                   |
+
+### `DuplicateTransitionConflict` shape
+
+```typescript
+interface DuplicateTransitionConflict {
+  fromState: string;
+  toState: string;
+  eventName: string | null;
+  existingConditionName: string | null;
+  newConditionName: string | null;
+}
+```
+
+### Example
+
+```typescript
+import {
+  ProcessBuilder,
+  DuplicateTransitionError,
+  CallbackCondition,
+} from "@camcima/finita";
+
+const c1 = new CallbackCondition("conditionA", () => true);
+const c2 = new CallbackCondition("conditionB", () => false);
+
+try {
+  new ProcessBuilder("conflict")
+    .addState("draft", { initial: true })
+    .addState("submitted")
+    .addTransition("draft", "submitted", { event: "submit", condition: c1 })
+    .addTransition("draft", "submitted", { event: "submit", condition: c2 }) // conflict!
+    .build();
+} catch (error) {
+  if (error instanceof DuplicateTransitionError) {
+    console.log(error.conflict.fromState); // 'draft'
+    console.log(error.conflict.existingConditionName); // 'conditionA'
+    console.log(error.conflict.newConditionName); // 'conditionB'
+  }
+}
+```
+
+---
+
+## FinitaError
+
+**Import:** `import { FinitaError } from '@camcima/finita'`
+
+Abstract base class for every error thrown by `@camcima/finita`. Every typed
+error class in this document extends `FinitaError`. Use `instanceof FinitaError`
+to catch any library-thrown error in one branch.
+
+### Properties
+
+| Property  | Type     | Description                                                    |
+| --------- | -------- | -------------------------------------------------------------- |
+| `code`    | `string` | Discriminator unique to each subclass (e.g. `"stateNotFound"`) |
+| `message` | `string` | Human-readable description                                     |
+| `name`    | `string` | The subclass name                                              |
+
+### Example
+
+```typescript
+import { FinitaError } from "@camcima/finita";
+
+try {
+  await statemachine.triggerEvent("go");
+} catch (err) {
+  if (err instanceof FinitaError) {
+    switch (err.code) {
+      case "wrongEventForState":
+        /* ... */ break;
+      case "automaticTransitionCycle":
+        /* ... */ break;
+      default: /* ... */
+    }
+  } else {
+    throw err;
+  }
+}
+```
+
+---
+
+## StateNotFoundError
+
+**Import:** `import { StateNotFoundError } from '@camcima/finita'`
+
+Thrown by `StateCollection.getState(name)` when no state with that name exists.
+
+### Properties
+
+| Property          | Type                | Description                              |
+| ----------------- | ------------------- | ---------------------------------------- |
+| `code`            | `"stateNotFound"`   | Discriminator                            |
+| `stateName`       | `string`            | The name that was looked up              |
+| `availableStates` | `readonly string[]` | Names that are present in the collection |
+| `name`            | `string`            | `'StateNotFoundError'`                   |
+
+---
+
+## StateEventNotFoundError
+
+**Import:** `import { StateEventNotFoundError } from '@camcima/finita'`
+
+Thrown by `State.getEvent(name)` when the named event is not declared on the state.
+
+### Properties
+
+| Property    | Type                   | Description                       |
+| ----------- | ---------------------- | --------------------------------- |
+| `code`      | `"stateEventNotFound"` | Discriminator                     |
+| `stateName` | `string`               | The state being queried           |
+| `eventName` | `string`               | The event name that was looked up |
+| `name`      | `string`               | `'StateEventNotFoundError'`       |
+
+---
+
+## ProcessNotFoundError
+
+**Import:** `import { ProcessNotFoundError } from '@camcima/finita'`
+
+Thrown by `AbstractNamedProcessDetector.detectProcess(subject)` when no process matches the detected name.
+
+### Properties
+
+| Property             | Type                | Description                                   |
+| -------------------- | ------------------- | --------------------------------------------- |
+| `code`               | `"processNotFound"` | Discriminator                                 |
+| `processName`        | `string`            | The process name that was detected            |
+| `availableProcesses` | `readonly string[]` | Names of processes registered on the detector |
+| `name`               | `string`            | `'ProcessNotFoundError'`                      |
+
+---
+
+## InvalidSubjectError
+
+**Import:** `import { InvalidSubjectError } from '@camcima/finita'`
+
+Thrown by `StatefulStateNameDetector.detectCurrentStateName(subject)` (and any future detector with a structural subject contract) when the subject does not satisfy the expected interface.
+
+### Properties
+
+| Property            | Type                | Description                                         |
+| ------------------- | ------------------- | --------------------------------------------------- |
+| `code`              | `"invalidSubject"`  | Discriminator                                       |
+| `expectedInterface` | `string`            | Name of the interface the subject failed to satisfy |
+| `missingMembers`    | `readonly string[]` | Method/property names that were absent              |
+| `name`              | `string`            | `'InvalidSubjectError'`                             |
+
+---
+
+## AmbiguousTransitionError
+
+**Import:** `import { AmbiguousTransitionError } from '@camcima/finita'`
+
+Thrown by `OneOrNoneActiveTransition.selectTransition(transitions)` when more than one transition is simultaneously active.
+
+### Properties
+
+| Property      | Type                    | Description                      |
+| ------------- | ----------------------- | -------------------------------- |
+| `code`        | `"ambiguousTransition"` | Discriminator                    |
+| `activeCount` | `number`                | How many transitions were active |
+| `name`        | `string`                | `'AmbiguousTransitionError'`     |
+
+---
+
+## AutomaticTransitionCycleError
+
+**Import:** `import { AutomaticTransitionCycleError } from '@camcima/finita'`
+
+Thrown by `Statemachine` when an automatic-transition cycle is detected during `triggerEvent` / `checkTransitions`. Indicates the graph would loop forever.
+
+### Properties
+
+| Property            | Type                         | Description                             |
+| ------------------- | ---------------------------- | --------------------------------------- |
+| `code`              | `"automaticTransitionCycle"` | Discriminator                           |
+| `targetStateName`   | `string`                     | The state already visited in this run   |
+| `visitedStateNames` | `readonly string[]`          | The states visited so far in this drive |
+| `name`              | `string`                     | `'AutomaticTransitionCycleError'`       |

@@ -1,5 +1,6 @@
 import type { ProcessDetectorInterface } from "../interfaces/ProcessDetectorInterface.js";
 import type { ProcessInterface } from "../interfaces/ProcessInterface.js";
+import { ProcessNotFoundError } from "../error/ProcessNotFoundError.js";
 
 export abstract class AbstractNamedProcessDetector<
   TSubject = unknown,
@@ -20,7 +21,7 @@ export abstract class AbstractNamedProcessDetector<
     const name = this.detectProcessName(subject);
     const process = this.processes.get(name);
     if (!process) {
-      throw new Error(`Process "${name}" not found`);
+      throw new ProcessNotFoundError(name, this.processes.keys());
     }
     return process;
   }

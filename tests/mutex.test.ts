@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { NullMutex, LockAdapterMutex } from "../src/index.js";
-import type { LockAdapterInterface } from "../src/index.js";
+import {
+  NullMutex,
+  LockAdapterMutex,
+  Statemachine,
+  ProcessBuilder,
+} from "../src/index.js";
+import type { LockAdapterInterface, MutexInterface } from "../src/index.js";
 
 describe("NullMutex", () => {
   it("should always acquire lock", () => {
@@ -74,5 +79,67 @@ describe("LockAdapterMutex", () => {
     const mutex = new LockAdapterMutex(adapter, "resource1");
     await mutex.acquireLock();
     expect(await mutex.isLocked()).toBe(true);
+  });
+});
+
+describe("Statemachine mutex regression", () => {
+  it("honors an already-held mutex without reacquiring (review fix)", async () => {
+    class NonIdempotentMutex implements MutexInterface {
+      private acquired = false;
+
+      acquireLock(): boolean {
+        if (this.acquired) {
+          throw new Error(
+            "NonIdempotentMutex.acquireLock called while already acquired",
+          );
+        }
+        this.acquired = true;
+        return true;
+      }
+
+      releaseLock(): boolean {
+        if (!this.acquired) {
+          throw new Error(
+            "NonIdempotentMutex.releaseLock called while not acquired",
+          );
+        }
+        this.acquired = false;
+        return true;
+      }
+
+      isAcquired(): boolean {
+        return this.acquired;
+      }
+
+      isLocked(): boolean {
+        return false;
+      }
+    }
+
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const mutex = new NonIdempotentMutex();
+    const sm = new Statemachine({}, process, {
+      mutex,
+      autoreleaseLock: false,
+    });
+
+    const acquired = await sm.acquireLock();
+    expect(acquired).toBe(true);
+    expect(mutex.isAcquired()).toBe(true);
+
+    // The bug being fixed: runOperation used to call mutex.acquireLock()
+    // unconditionally, which throws on a non-idempotent mutex that's
+    // already held by the user. After the fix, runOperation skips
+    // acquire+release when isAcquired() is already true.
+    await sm.triggerEvent("go");
+    expect(sm.getCurrentState().getName()).toBe("b");
+    expect(mutex.isAcquired()).toBe(true); // still held by the user
+
+    await sm.releaseLock();
+    expect(mutex.isAcquired()).toBe(false);
   });
 });

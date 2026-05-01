@@ -6,11 +6,6 @@ export interface CallbackInterface {
 }
 
 export interface DispatcherInterface extends CallbackInterface {
-  dispatch(
-    event: EventInterface,
-    args?: unknown[],
-    onReadyCallback?: CallbackInterface,
-  ): void;
-  isReady(): boolean;
+  dispatch(event: EventInterface, args?: unknown[]): void;
   invoke(): Promise<void>;
 }

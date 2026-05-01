@@ -3,12 +3,16 @@ export type { MaybePromise } from "./MaybePromise.js";
 
 // Core classes
 export { Event } from "./Event.js";
-export { State } from "./State.js";
-export { Transition } from "./Transition.js";
-export { StateCollection } from "./StateCollection.js";
 export { Process } from "./Process.js";
+export { State } from "./State.js"; // exported for type / instanceof use only
+export { Transition } from "./Transition.js"; // same
+export { ProcessBuilder } from "./ProcessBuilder.js";
+export type {
+  AddStateOptions,
+  AddTransitionOptions,
+  BuildOptions,
+} from "./ProcessBuilder.js";
 export { Statemachine } from "./Statemachine.js";
-export { Dispatcher } from "./Dispatcher.js";
 
 // Interfaces
 export type {
@@ -17,6 +21,9 @@ export type {
   Weighted,
   Observer,
   ObservableSubject,
+  AfterTransitionObserver,
+  EnqueueContext,
+  BeforeTransitionObserver,
   ConditionInterface,
   EventInterface,
   TransitionInterface,
@@ -24,10 +31,13 @@ export type {
   StateCollectionInterface,
   ProcessInterface,
   StatemachineInterface,
+  StatemachineOptions,
   MutexInterface,
   MutexFactoryInterface,
   LockAdapterInterface,
   TransitionSelectorInterface,
+  TransitionFrame,
+  ProposedTransitionFrame,
   ProcessDetectorInterface,
   StateNameDetectorInterface,
   FactoryInterface,
@@ -86,9 +96,6 @@ export {
   StatefulStateNameDetector,
 } from "./factory/index.js";
 
-// Utils
-export { SetupHelper, StateCollectionMerger } from "./util/index.js";
-
 // Graph
 export { GraphBuilder } from "./graph/index.js";
 export type {
@@ -101,7 +108,21 @@ export type {
 
 // Errors
 export {
+  FinitaError,
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   DuplicateStateError,
+  ProcessFinalizedError,
+  GraphValidationError,
+  DuplicateTransitionError,
+  StateNotFoundError,
+  StateEventNotFoundError,
+  ProcessNotFoundError,
+  InvalidSubjectError,
+  AmbiguousTransitionError,
+  AutomaticTransitionCycleError,
+} from "./error/index.js";
+export type {
+  GraphValidationCode,
+  DuplicateTransitionConflict,
 } from "./error/index.js";
