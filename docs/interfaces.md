@@ -290,24 +290,15 @@ interface ConditionInterface<TSubject = unknown> extends Named {
 
 ```typescript
 interface FactoryInterface<TSubject = unknown> {
+  setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
+  setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
+  attachBeforeObserver(observer: BeforeTransitionObserver<TSubject>): void;
+  detachBeforeObserver(observer: BeforeTransitionObserver<TSubject>): void;
+  attachAfterObserver(observer: AfterTransitionObserver<TSubject>): void;
+  detachAfterObserver(observer: AfterTransitionObserver<TSubject>): void;
   createStatemachine(
     subject: TSubject,
   ): Promise<StatemachineInterface<TSubject>>;
-  setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void;
-  setTransitionSelector(selector: TransitionSelectorInterface<TSubject>): void;
-  attachStatemachineObserver(
-    observer:
-      | AfterTransitionObserver<TSubject>
-      | BeforeTransitionObserver<TSubject>,
-  ): void;
-  detachStatemachineObserver(
-    observer:
-      | AfterTransitionObserver<TSubject>
-      | BeforeTransitionObserver<TSubject>,
-  ): void;
-  getStatemachineObservers(): Iterable<
-    AfterTransitionObserver<TSubject> | BeforeTransitionObserver<TSubject>
-  >;
 }
 ```
 

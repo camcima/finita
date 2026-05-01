@@ -60,14 +60,15 @@ new Factory<TSubject = unknown>(
 
 ### Methods
 
-| Method                                 | Return Type                                | Description                                                    |
-| -------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `createStatemachine(subject)`          | `Promise<StatemachineInterface<TSubject>>` | Creates a fully configured state machine for the subject       |
-| `setMutexFactory(factory)`             | `void`                                     | Sets the mutex factory for concurrency control                 |
-| `setTransitionSelector(selector)`      | `void`                                     | Sets the transition selector strategy                          |
-| `attachStatemachineObserver(observer)` | `void`                                     | Registers an observer to attach to every created state machine |
-| `detachStatemachineObserver(observer)` | `void`                                     | Unregisters an observer                                        |
-| `getStatemachineObservers()`           | `Iterable<Observer>`                       | Returns all registered observers                               |
+| Method                            | Return Type                                | Description                                                                                   |
+| --------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `createStatemachine(subject)`     | `Promise<StatemachineInterface<TSubject>>` | Creates a fully configured state machine for the subject                                      |
+| `setMutexFactory(factory)`        | `void`                                     | Sets the mutex factory for concurrency control. Pass `null` to clear a previously-set factory |
+| `setTransitionSelector(selector)` | `void`                                     | Sets the transition selector strategy                                                         |
+| `attachBeforeObserver(observer)`  | `void`                                     | Registers a `BeforeTransitionObserver` to attach to every created state machine               |
+| `detachBeforeObserver(observer)`  | `void`                                     | Unregisters a previously attached before-observer                                             |
+| `attachAfterObserver(observer)`   | `void`                                     | Registers an `AfterTransitionObserver` to attach to every created state machine               |
+| `detachAfterObserver(observer)`   | `void`                                     | Unregisters a previously attached after-observer                                              |
 
 ### Example
 
@@ -88,8 +89,8 @@ const factory = new Factory(
 
 // Configure
 factory.setTransitionSelector(new ScoreTransition());
-factory.attachStatemachineObserver(new StatefulStatusChanger(order1)); // subject injected at construction
-factory.attachStatemachineObserver(new TransitionLogger(logger));
+factory.attachAfterObserver(new StatefulStatusChanger(order1)); // subject injected at construction
+factory.attachAfterObserver(new TransitionLogger(logger));
 
 // Create state machines -- all configuration is applied automatically
 const sm1 = await factory.createStatemachine(order1);
@@ -321,8 +322,8 @@ factory.setTransitionSelector(new ScoreTransition<Article>());
 
 // 3. Register observers -- StatefulStatusChanger requires the subject at construction;
 //    when used with Factory, pass the subject inside createStatemachine or use a wrapper
-factory.attachStatemachineObserver(new OnEnterObserver());
-factory.attachStatemachineObserver(new TransitionLogger(logger));
+factory.attachAfterObserver(new OnEnterObserver());
+factory.attachAfterObserver(new TransitionLogger(logger));
 
 // 4. Optionally add locking -- subject is typed, no cast needed
 factory.setMutexFactory(
