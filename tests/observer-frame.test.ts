@@ -190,6 +190,131 @@ describe("Observer frames and ordering (closes #2, #4)", () => {
     expect(caught).not.toBeInstanceOf(AggregateError);
     expect((caught as Error).message).toBe("only-one");
   });
+
+  it("BeforeTransitionObserver fires on the happy path with a frozen frame", async () => {
+    const seen: ProposedTransitionFrame[] = [];
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process);
+    const observer: BeforeTransitionObserver = {
+      notify(frame: ProposedTransitionFrame): void {
+        seen.push(frame);
+      },
+    };
+    sm.attachBefore(observer);
+
+    await sm.triggerEvent("go");
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].fromState.getName()).toBe("a");
+    expect(seen[0].toState.getName()).toBe("b");
+    expect(Object.isFrozen(seen[0])).toBe(true);
+    expect(sm.getCurrentState().getName()).toBe("b");
+  });
+
+  it("multiple before-observers run in attach order until one throws", async () => {
+    const order: string[] = [];
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process);
+    sm.attachBefore({
+      notify(): void {
+        order.push("first");
+      },
+    });
+    sm.attachBefore({
+      notify(): void {
+        order.push("second");
+        throw new Error("veto-second");
+      },
+    });
+    sm.attachBefore({
+      notify(): void {
+        order.push("third"); // should not run — second already threw
+      },
+    });
+
+    await expect(sm.triggerEvent("go")).rejects.toThrow("veto-second");
+    expect(order).toEqual(["first", "second"]);
+    expect(sm.getCurrentState().getName()).toBe("a");
+  });
+
+  it("detachBefore stops a previously attached before-observer from firing", async () => {
+    let calls = 0;
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "a", { event: "back" })
+      .build();
+    const sm = new Statemachine({}, process);
+    const observer: BeforeTransitionObserver = {
+      notify(): void {
+        calls++;
+      },
+    };
+    sm.attachBefore(observer);
+    await sm.triggerEvent("go"); // a -> b, observer fires once
+    expect(calls).toBe(1);
+
+    sm.detachBefore(observer);
+    await sm.triggerEvent("back"); // b -> a, observer should NOT fire
+    expect(calls).toBe(1);
+
+    // Detaching an observer that was never attached is a no-op.
+    sm.detachBefore({ notify(): void {} });
+  });
+
+  it("detachAfter stops a previously attached after-observer from firing", async () => {
+    let calls = 0;
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "a", { event: "back" })
+      .build();
+    const sm = new Statemachine({}, process);
+    const observer: AfterTransitionObserver = {
+      notify(): void {
+        calls++;
+      },
+    };
+    sm.attachAfter(observer);
+    await sm.triggerEvent("go");
+    expect(calls).toBe(1);
+
+    sm.detachAfter(observer);
+    await sm.triggerEvent("back");
+    expect(calls).toBe(1);
+
+    sm.detachAfter({ notify(): void {} });
+  });
+
+  it("getBeforeObservers exposes attached before-observers", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process);
+
+    expect(Array.from(sm.getBeforeObservers())).toEqual([]);
+
+    const o1: BeforeTransitionObserver = { notify(): void {} };
+    const o2: BeforeTransitionObserver = { notify(): void {} };
+    sm.attachBefore(o1);
+    sm.attachBefore(o2);
+    expect(Array.from(sm.getBeforeObservers())).toEqual([o1, o2]);
+
+    sm.detachBefore(o1);
+    expect(Array.from(sm.getBeforeObservers())).toEqual([o2]);
+  });
 });
 
 // Suppress unused import warnings.
