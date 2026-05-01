@@ -319,14 +319,16 @@ describe("GraphBuilder", () => {
         .addTransition("s1", "s2", { event: "go" })
         .build();
       const s1 = process.getState("s1");
-      s1.getEvent("go").attach({
+      const first = {
         getName: () => "first",
         update: () => {},
-      });
-      s1.getEvent("go").attach({
+      };
+      const second = {
         getName: () => "second",
         update: () => {},
-      });
+      };
+      s1.getEvent("go").attach(first);
+      s1.getEvent("go").attach(second);
 
       const builder = new GraphBuilder();
       builder.addState(s1);
