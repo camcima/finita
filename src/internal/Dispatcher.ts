@@ -1,26 +1,15 @@
-import type {
-  DispatcherInterface,
-  CallbackInterface,
-} from "../interfaces/DispatcherInterface.js";
+import type { DispatcherInterface } from "../interfaces/DispatcherInterface.js";
 import type { EventInterface } from "../interfaces/EventInterface.js";
 
 export class Dispatcher implements DispatcherInterface {
   private commands: Array<{ event: EventInterface; args: unknown[] }> = [];
-  private onReadyCallbacks: CallbackInterface[] = [];
   private ready = false;
 
-  dispatch(
-    event: EventInterface,
-    args: unknown[] = [],
-    onReadyCallback?: CallbackInterface,
-  ): void {
+  dispatch(event: EventInterface, args: unknown[] = []): void {
     if (this.ready) {
       throw new Error("Was already invoked!");
     }
     this.commands.push({ event, args });
-    if (onReadyCallback) {
-      this.onReadyCallbacks.push(onReadyCallback);
-    }
   }
 
   async invoke(): Promise<void> {
@@ -31,12 +20,5 @@ export class Dispatcher implements DispatcherInterface {
       await event.invoke(...args);
     }
     this.ready = true;
-    for (const callback of this.onReadyCallbacks) {
-      await callback.invoke();
-    }
-  }
-
-  isReady(): boolean {
-    return this.ready;
   }
 }
