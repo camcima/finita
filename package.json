@@ -1,6 +1,6 @@
 {
   "name": "@camcima/finita",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A full-featured finite state machine library for TypeScript",
   "type": "module",
   "main": "dist/index.cjs",
