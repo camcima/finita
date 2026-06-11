@@ -14,6 +14,8 @@ export class StatefulStatusChanger<
    * shared safely across every machine a Factory creates.
    */
   constructor(subject?: TSubject) {
+    // null sentinel lets `?? frame.subject` in notify() distinguish
+    // "no subject pinned" from any valid subject value.
     this.subject = subject ?? null;
   }
 

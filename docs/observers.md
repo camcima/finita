@@ -245,7 +245,7 @@ console.log(order.status); // 'shipped'
 - You need the subject's status property to stay in sync with the state machine
 - You want to persist state changes to a database through the subject's setter
 - **With `Factory` (recommended):** call `new StatefulStatusChanger()` with no argument and register it via `factory.attachAfterObserver(...)`. The observer writes to `frame.subject`, so one instance serves every machine the factory creates — each machine's transitions update its own subject.
-- **Pinning a specific object:** call `new StatefulStatusChanger(subject)` with an explicit subject when you want all transitions (regardless of which machine fires them) to update that one object.
+- **Pinning a specific object:** call `new StatefulStatusChanger(subject)` with an explicit subject when you want all transitions (regardless of which machine fires them) to update that one object. When registering on a `Factory` (which shares one observer instance across every machine it creates), use the no-arg form — passing an explicit subject would make every machine write to that one subject.
 
 ---
 
