@@ -35,6 +35,7 @@ export class Statemachine<
   private lastState: StateInterface | null = null;
 
   private autoreleaseLock: boolean;
+  private readonly maxAutomaticHops: number;
 
   private readonly queue = new OperationQueue();
   private running = false;
@@ -57,6 +58,7 @@ export class Statemachine<
       options.transitionSelector ?? new OneOrNoneActiveTransition<TSubject>();
     this.mutex = options.mutex ?? new NullMutex();
     this.autoreleaseLock = options.autoreleaseLock ?? true;
+    this.maxAutomaticHops = options.maxAutomaticHops ?? 100;
   }
 
   // --- public getters ---
@@ -264,7 +266,7 @@ export class Statemachine<
     context: Map<string, unknown>,
   ): Promise<void> {
     let event = initialEvent;
-    const automaticVisited = new Set<StateInterface>();
+    let automaticHops = 0;
 
     // Fire event-attached observers (imperative commands attached via
     // event.attach()) when the user-supplied event is resolved, regardless
@@ -298,11 +300,11 @@ export class Statemachine<
       const target = selected.getTargetState();
 
       if (selected.getEventName() === null) {
-        automaticVisited.add(this.currentState);
-        if (automaticVisited.has(target)) {
+        automaticHops += 1;
+        if (automaticHops > this.maxAutomaticHops) {
           throw new AutomaticTransitionCycleError(
             target.getName(),
-            Array.from(automaticVisited).map((s) => s.getName()),
+            this.maxAutomaticHops,
           );
         }
       }

@@ -412,13 +412,17 @@ Thrown by `OneOrNoneActiveTransition.selectTransition(transitions)` when more th
 
 **Import:** `import { AutomaticTransitionCycleError } from '@camcima/finita'`
 
-Thrown by `Statemachine` when an automatic-transition cycle is detected during `triggerEvent` / `checkTransitions`. Indicates the graph would loop forever.
+Thrown by `Statemachine` when the number of consecutive automatic (eventless) transitions in a single operation exceeds the `maxAutomaticHops` limit (default `100`). This guards against genuinely non-terminating automatic loops while still allowing legitimate bounded loops such as condition-terminated retry cycles.
+
+**Partial-commit caveat:** any transitions already committed before the limit was hit are **not** rolled back. Observers (e.g. persistence layers) attached to those hops will have already fired.
+
+To allow a longer but still bounded loop, pass a higher limit: `new Statemachine(subject, process, { maxAutomaticHops: 500 })`.
 
 ### Properties
 
-| Property            | Type                         | Description                             |
-| ------------------- | ---------------------------- | --------------------------------------- |
-| `code`              | `"automaticTransitionCycle"` | Discriminator                           |
-| `targetStateName`   | `string`                     | The state already visited in this run   |
-| `visitedStateNames` | `readonly string[]`          | The states visited so far in this drive |
-| `name`              | `string`                     | `'AutomaticTransitionCycleError'`       |
+| Property    | Type                         | Description                                           |
+| ----------- | ---------------------------- | ----------------------------------------------------- |
+| `code`      | `"automaticTransitionCycle"` | Discriminator                                         |
+| `stateName` | `string`                     | The last target state when the hop limit was exceeded |
+| `hopLimit`  | `number`                     | The `maxAutomaticHops` value that was exceeded        |
+| `name`      | `string`                     | `'AutomaticTransitionCycleError'`                     |

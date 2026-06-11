@@ -146,7 +146,7 @@ describe("typed throws", () => {
   });
 
   describe("Statemachine automatic-cycle detection", () => {
-    it("throws AutomaticTransitionCycleError with target and visited names", async () => {
+    it("throws AutomaticTransitionCycleError with stateName and hopLimit after exceeding maxAutomaticHops", async () => {
       const { Statemachine } = await import("../src/Statemachine.js");
       const process = new ProcessBuilder("p")
         .addState("s1", { initial: true })
@@ -154,7 +154,8 @@ describe("typed throws", () => {
         .addTransition("s1", "s2") // automatic
         .addTransition("s2", "s1") // automatic
         .build();
-      const sm = new Statemachine({}, process);
+      // Use a low hop limit so the test runs fast.
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 5 });
       let caught: unknown;
       try {
         await sm.checkTransitions();
@@ -164,9 +165,10 @@ describe("typed throws", () => {
       expect(caught).toBeInstanceOf(AutomaticTransitionCycleError);
       const e = caught as AutomaticTransitionCycleError;
       expect(e.code).toBe("automaticTransitionCycle");
-      expect(typeof e.targetStateName).toBe("string");
-      expect(Array.isArray([...e.visitedStateNames])).toBe(true);
-      expect(e.message).toContain("Automatic transition cycle detected");
+      expect(typeof e.stateName).toBe("string");
+      expect(typeof e.hopLimit).toBe("number");
+      expect(e.hopLimit).toBe(5);
+      expect(e.message).toContain("exceeded 5 hops");
     });
   });
 });
