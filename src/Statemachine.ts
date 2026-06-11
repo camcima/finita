@@ -145,10 +145,12 @@ export class Statemachine<
     context: Map<string, unknown> | undefined,
     resolve: () => void,
     reject: (err: unknown) => void,
+    ifStateName?: string,
   ): void {
     this.queue.enqueue({
       eventName,
       context: context ?? new Map(),
+      ifStateName,
       resolve,
       reject,
     });
@@ -171,6 +173,15 @@ export class Statemachine<
   }
 
   private async runOperation(op: QueuedOperation): Promise<void> {
+    if (
+      op.ifStateName !== undefined &&
+      this.currentState.getName() !== op.ifStateName
+    ) {
+      // Stale chained op — the machine moved on before it was dequeued.
+      op.resolve();
+      return;
+    }
+
     // If the caller has already acquired the mutex (e.g. manual lock
     // management with autoreleaseLock: false), don't reacquire — many
     // mutex implementations (database advisory locks, redis SET NX, etc.)
@@ -295,7 +306,7 @@ export class Statemachine<
 
         // After phase — collect errors, notify all, then rethrow.
         const enqueueCtx: EnqueueContext = {
-          enqueue: (chainedEventName, chainedCtx) => {
+          enqueue: (chainedEventName, chainedCtx, ifStateName) => {
             this.enqueueOperation(
               chainedEventName,
               chainedCtx,
@@ -305,6 +316,7 @@ export class Statemachine<
               () => {
                 /* chained errors do not propagate to the original caller */
               },
+              ifStateName,
             );
           },
         };
