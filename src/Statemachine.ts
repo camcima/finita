@@ -50,9 +50,10 @@ export class Statemachine<
   ) {
     this.subject = subject;
     this.process = process;
-    this.currentState = options.initialStateName
-      ? process.getState(options.initialStateName)
-      : process.getInitialState();
+    this.currentState =
+      options.initialStateName !== undefined
+        ? process.getState(options.initialStateName)
+        : process.getInitialState();
     this.transitionSelector =
       options.transitionSelector ?? new OneOrNoneActiveTransition<TSubject>();
     this.mutex = options.mutex ?? new NullMutex();
