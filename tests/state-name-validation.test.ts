@@ -28,6 +28,11 @@ describe("ProcessBuilder.addState name validation", () => {
     expect(() =>
       b.addTransition("a", "b", { event: "go", condition: cond }),
     ).toThrow(GraphValidationError);
+    try {
+      b.addTransition("a", "b", { event: "go", condition: cond });
+    } catch (err) {
+      expect((err as GraphValidationError).code).toBe("invalidConditionName");
+    }
   });
 
   it("accepts clean names", () => {

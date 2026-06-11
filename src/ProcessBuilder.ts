@@ -90,11 +90,12 @@ export class ProcessBuilder<TSubject = unknown> {
       eventName = options.event;
     }
     if (options.condition) {
+      const conditionName = options.condition.getName();
       this.validateName(
         "invalidConditionName",
-        options.condition.getName(),
+        conditionName,
         `addTransition called with an invalid condition name from "${fromState}" to "${toState}"`,
-        { fromState, toState, conditionName: options.condition.getName() },
+        { fromState, toState, conditionName },
       );
     }
     this.transitionSpecs.push({
