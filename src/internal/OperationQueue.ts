@@ -1,7 +1,5 @@
-export type OperationKind = "triggerEvent" | "checkTransitions";
-
 export interface QueuedOperation {
-  kind: OperationKind;
+  /** Event name for triggerEvent operations; null for checkTransitions. */
   eventName: string | null;
   context: Map<string, unknown>;
   resolve: () => void;

@@ -132,28 +132,30 @@ export class Statemachine<
 
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.queue.enqueue({
-        kind: "triggerEvent",
-        eventName: name,
-        context: context ?? new Map(),
-        resolve,
-        reject,
-      });
-      void this.runIfIdle();
+      this.enqueueOperation(name, context, resolve, reject);
     });
   }
 
   checkTransitions(context?: Map<string, unknown>): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.queue.enqueue({
-        kind: "checkTransitions",
-        eventName: null,
-        context: context ?? new Map(),
-        resolve,
-        reject,
-      });
-      void this.runIfIdle();
+      this.enqueueOperation(null, context, resolve, reject);
     });
+  }
+
+  /** Single entry point to the operation queue — every enqueue kicks the runner. */
+  private enqueueOperation(
+    eventName: string | null,
+    context: Map<string, unknown> | undefined,
+    resolve: () => void,
+    reject: (err: unknown) => void,
+  ): void {
+    this.queue.enqueue({
+      eventName,
+      context: context ?? new Map(),
+      resolve,
+      reject,
+    });
+    void this.runIfIdle();
   }
 
   // --- internal runner ---
@@ -187,7 +189,7 @@ export class Statemachine<
       }
 
       const event =
-        op.kind === "triggerEvent" ? this.resolveEvent(op.eventName!) : null;
+        op.eventName !== null ? this.resolveEvent(op.eventName) : null;
 
       await this.processOperation(event, op.context);
       op.resolve();
@@ -298,17 +300,16 @@ export class Statemachine<
         // After phase — collect errors, notify all, then rethrow.
         const enqueueCtx: EnqueueContext = {
           enqueue: (chainedEventName, chainedCtx) => {
-            this.queue.enqueue({
-              kind: "triggerEvent",
-              eventName: chainedEventName,
-              context: chainedCtx ?? new Map(),
-              resolve: () => {
+            this.enqueueOperation(
+              chainedEventName,
+              chainedCtx,
+              () => {
                 /* chained ops are not awaited by the original caller */
               },
-              reject: () => {
+              () => {
                 /* chained errors do not propagate to the original caller */
               },
-            });
+            );
           },
         };
 
