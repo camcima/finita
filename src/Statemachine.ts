@@ -130,15 +130,15 @@ export class Statemachine<
   // --- public top-level operations ---
 
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void> {
-    this.assertNotReentrant(`triggerEvent("${name}")`);
     return new Promise<void>((resolve, reject) => {
+      this.assertNotReentrant(`triggerEvent("${name}")`);
       this.enqueueOperation(name, context, resolve, reject);
     });
   }
 
   checkTransitions(context?: Map<string, unknown>): Promise<void> {
-    this.assertNotReentrant("checkTransitions()");
     return new Promise<void>((resolve, reject) => {
+      this.assertNotReentrant("checkTransitions()");
       this.enqueueOperation(null, context, resolve, reject);
     });
   }
