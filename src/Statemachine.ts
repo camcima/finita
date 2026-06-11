@@ -284,8 +284,10 @@ export class Statemachine<
           machineName: this.process.getName(),
         });
 
-        // Before phase — first observer to throw aborts.
-        for (const observer of this.beforeObservers) {
+        // Before phase — first observer to throw aborts. Iterate a snapshot
+        // so observers that detach (themselves or others) during notify
+        // can't shift the live array under the iterator.
+        for (const observer of [...this.beforeObservers]) {
           await observer.notify(proposedFrame);
         }
 
@@ -322,7 +324,7 @@ export class Statemachine<
         };
 
         const errors: unknown[] = [];
-        for (const observer of this.afterObservers) {
+        for (const observer of [...this.afterObservers]) {
           try {
             await observer.notify(committedFrame, enqueueCtx);
           } catch (err) {
