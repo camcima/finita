@@ -10,10 +10,7 @@ import type {
   AfterTransitionObserver,
   EnqueueContext,
 } from "./interfaces/AfterTransitionObserverInterface.js";
-import type {
-  TransitionFrame,
-  ProposedTransitionFrame,
-} from "./interfaces/TransitionFrameInterface.js";
+import type { TransitionFrame } from "./interfaces/TransitionFrameInterface.js";
 import type { StatemachineOptions } from "./interfaces/StatemachineOptions.js";
 import { OneOrNoneActiveTransition } from "./selector/OneOrNoneActiveTransition.js";
 import { NullMutex } from "./mutex/NullMutex.js";
@@ -273,7 +270,8 @@ export class Statemachine<
       }
 
       if (this.currentState !== target) {
-        const proposedFrame: ProposedTransitionFrame<TSubject> = Object.freeze({
+        const frame: TransitionFrame<TSubject> = Object.freeze({
+          subject: this.subject,
           fromState: this.currentState,
           toState: target,
           transition: selected,
@@ -288,24 +286,12 @@ export class Statemachine<
         // so observers that detach (themselves or others) during notify
         // can't shift the live array under the iterator.
         for (const observer of [...this.beforeObservers]) {
-          await observer.notify(proposedFrame);
+          await observer.notify(frame);
         }
 
         // Commit.
-        const fromState = this.currentState;
-        this.lastState = fromState;
+        this.lastState = this.currentState;
         this.currentState = target;
-
-        const committedFrame: TransitionFrame<TSubject> = Object.freeze({
-          fromState,
-          toState: target,
-          transition: selected,
-          event,
-          condition: selected.getCondition(),
-          context: this.readonlyContext(context),
-          timestamp: proposedFrame.timestamp,
-          machineName: this.process.getName(),
-        });
 
         // After phase — collect errors, notify all, then rethrow.
         const enqueueCtx: EnqueueContext = {
@@ -326,7 +312,7 @@ export class Statemachine<
         const errors: unknown[] = [];
         for (const observer of [...this.afterObservers]) {
           try {
-            await observer.notify(committedFrame, enqueueCtx);
+            await observer.notify(frame, enqueueCtx);
           } catch (err) {
             errors.push(err);
           }

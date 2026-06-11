@@ -31,9 +31,6 @@ export class TransitionLogger<
   notify(frame: TransitionFrame<TSubject>): void {
     let message = "Transition";
 
-    // Subject identity isn't on the frame in v3 — callers who want subject
-    // names attach a custom observer that closes over the subject.
-
     message += ` from "${asString(frame.fromState)}" to "${asString(frame.toState)}"`;
 
     const eventName = frame.event ? frame.event.getName() : null;

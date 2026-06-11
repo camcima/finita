@@ -4,13 +4,18 @@ import type { EventInterface } from "./EventInterface.js";
 import type { ConditionInterface } from "./ConditionInterface.js";
 
 /**
- * Immutable snapshot passed to AfterTransitionObserver.notify().
+ * Immutable snapshot passed to transition observers.
  *
- * Captures the post-commit transition: state has already moved from
- * fromState to toState. Reading any field is safe and stable for the
- * duration of the observer call (and beyond — the frame is frozen).
+ * For AfterTransitionObserver.notify() the transition has committed:
+ * state has already moved from fromState to toState. For
+ * BeforeTransitionObserver.notify() the same shape represents the
+ * *proposed* transition — fromState is still the current state, and
+ * throwing aborts the commit. Reading any field is safe and stable for
+ * the duration of the observer call (and beyond — the frame is frozen).
  */
 export interface TransitionFrame<TSubject = unknown> {
+  /** The subject this machine drives — identifies whose transition this is. */
+  readonly subject: TSubject;
   readonly fromState: StateInterface;
   readonly toState: StateInterface;
   readonly transition: TransitionInterface<TSubject>;
@@ -22,13 +27,8 @@ export interface TransitionFrame<TSubject = unknown> {
 }
 
 /**
- * Immutable snapshot passed to BeforeTransitionObserver.notify().
- *
- * Same shape as TransitionFrame but represents a *proposed* transition
- * — fromState is still the current state at notification time. Throwing
- * from a before-observer aborts the transition; otherwise commit proceeds.
+ * The frame as seen by BeforeTransitionObserver — same shape; the
+ * distinct name documents the pre-commit timing.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ProposedTransitionFrame<
-  TSubject = unknown,
-> extends TransitionFrame<TSubject> {}
+export type ProposedTransitionFrame<TSubject = unknown> =
+  TransitionFrame<TSubject>;
