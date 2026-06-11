@@ -56,16 +56,17 @@ sm.attachAfter(new AuditLogger());
 
 Both observer interfaces receive a frame — an immutable snapshot of the transition. Its fields are:
 
-| Field         | Type                           | Description                                      |
-| ------------- | ------------------------------ | ------------------------------------------------ |
-| `fromState`   | `StateInterface`               | The state before the transition                  |
-| `toState`     | `StateInterface`               | The state after the transition                   |
-| `transition`  | `TransitionInterface`          | The selected transition                          |
-| `event`       | `EventInterface \| null`       | The triggering event (null for auto transitions) |
-| `condition`   | `ConditionInterface \| null`   | The guard condition (null if none)               |
-| `context`     | `ReadonlyMap<string, unknown>` | The context map passed to `triggerEvent`         |
-| `timestamp`   | `number`                       | `Date.now()` at transition time                  |
-| `machineName` | `string \| null`               | The process name                                 |
+| Field         | Type                           | Description                                                |
+| ------------- | ------------------------------ | ---------------------------------------------------------- |
+| `subject`     | `TSubject`                     | The subject this machine drives — whose transition this is |
+| `fromState`   | `StateInterface`               | The state before the transition                            |
+| `toState`     | `StateInterface`               | The state after the transition                             |
+| `transition`  | `TransitionInterface`          | The selected transition                                    |
+| `event`       | `EventInterface \| null`       | The triggering event (null for auto transitions)           |
+| `condition`   | `ConditionInterface \| null`   | The guard condition (null if none)                         |
+| `context`     | `ReadonlyMap<string, unknown>` | The context map passed to `triggerEvent`                   |
+| `timestamp`   | `number`                       | `Date.now()` at transition time                            |
+| `machineName` | `string \| null`               | The process name                                           |
 
 ### `EnqueueContext`
 
@@ -273,10 +274,13 @@ new OnEnterObserver(eventName?: string)
 
 1. After a state change, `notify(frame, ctx)` is called
 2. It checks if `frame.toState.hasEvent(eventName)` is `true`
-3. If yes, it calls `ctx.enqueue(eventName, ...)` to schedule the event
+3. If yes, it calls `ctx.enqueue(eventName, context, frame.toState.getName())` to schedule the event
 4. The enqueued event runs after the current top-level operation drains
+5. **The event only fires if the machine is still in `frame.toState` when the queue drains** — states passed through transiently by automatic transitions in the same operation do not fire `onEnter`
 
 > **v3 behavior change:** In v2, `OnEnterObserver` ran the chained event inline (with potential reentrancy). In v3 it enqueues — observers registered after `OnEnterObserver` see the original transition's frame, not the chained one. The final state after the full queue drains is identical, but intermediate observer state differs.
+>
+> The `ifStateName` guard (`frame.toState.getName()`) prevents a stale `onEnter` from firing when the machine was carried through that state by an automatic transition and has since moved on.
 
 ### Example: Running Commands on State Entry
 
@@ -431,7 +435,7 @@ sm.attachAfter(new TransitionLogger(logger));
 
 ### Event Observer
 
-Attach behavior to specific events on specific states (unchanged from v2):
+Attach behavior to specific events on specific states. Invoke arguments are received directly as the `args` parameter of `update` — do not call the deprecated `event.getInvokeArgs()`:
 
 ```typescript
 import type {
@@ -439,15 +443,14 @@ import type {
   ObservableSubject,
   MaybePromise,
 } from "@camcima/finita";
-import type { EventInterface } from "@camcima/finita";
 
 class SendEmailCommand implements Observer {
-  update(subject: ObservableSubject): MaybePromise<void> {
-    const event = subject as EventInterface;
-    const [order, context] = event.getInvokeArgs() as [
-      Order,
-      Map<string, unknown>,
-    ];
+  update(
+    subject: ObservableSubject,
+    args?: readonly unknown[],
+  ): MaybePromise<void> {
+    // For Statemachine events, args is [subject, context]
+    const [order] = (args ?? []) as [Order, Map<string, unknown>];
     sendEmail(order.customerEmail, "Your order has been shipped!");
   }
 }

@@ -244,29 +244,30 @@ new Event(name: string)
 
 ### Methods
 
-| Method                         | Return Type               | Description                                                               |
-| ------------------------------ | ------------------------- | ------------------------------------------------------------------------- |
-| `getName()`                    | `string`                  | Returns the event name                                                    |
-| `invoke(...args)`              | `Promise<void>`           | Sets invoke args, notifies all observers, then clears args                |
-| `getInvokeArgs()`              | `unknown[]`               | Returns the current invoke arguments (only available during notification) |
-| `attach(observer)`             | `void`                    | Adds an observer                                                          |
-| `detach(observer)`             | `void`                    | Removes an observer                                                       |
-| `notify()`                     | `Promise<void>`           | Notifies all attached observers                                           |
-| `getObservers()`               | `Iterable<Observer>`      | Returns all attached observers                                            |
-| `getMetadata()`                | `Record<string, unknown>` | Returns all metadata                                                      |
-| `getMetadataValue(key)`        | `unknown`                 | Returns metadata value                                                    |
-| `setMetadataValue(key, value)` | `void`                    | Sets metadata value                                                       |
-| `hasMetadataValue(key)`        | `boolean`                 | Checks if metadata key exists                                             |
-| `deleteMetadataValue(key)`     | `void`                    | Removes metadata key                                                      |
+| Method                         | Return Type               | Description                                                                                            |
+| ------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `getName()`                    | `string`                  | Returns the event name                                                                                 |
+| `invoke(...args)`              | `Promise<void>`           | Notifies all observers, passing args directly to each `Observer.update` call                           |
+| `getInvokeArgs()`              | `unknown[]`               | **Deprecated.** Always returns `[]`. Read args from the `args` parameter of `Observer.update` instead. |
+| `attach(observer)`             | `void`                    | Adds an observer                                                                                       |
+| `detach(observer)`             | `void`                    | Removes an observer                                                                                    |
+| `notify(args?)`                | `Promise<void>`           | Notifies all attached observers, passing `args` to each `update` call                                  |
+| `getObservers()`               | `Iterable<Observer>`      | Returns all attached observers                                                                         |
+| `getMetadata()`                | `Record<string, unknown>` | Returns all metadata                                                                                   |
+| `getMetadataValue(key)`        | `unknown`                 | Returns metadata value                                                                                 |
+| `setMetadataValue(key, value)` | `void`                    | Sets metadata value                                                                                    |
+| `hasMetadataValue(key)`        | `boolean`                 | Checks if metadata key exists                                                                          |
+| `deleteMetadataValue(key)`     | `void`                    | Removes metadata key                                                                                   |
 
 ### Invoke Flow
 
 When `invoke()` is called:
 
-1. The invoke arguments are stored on the event
-2. `notify()` is called, iterating over all observers
-3. Each observer's `update(event)` is awaited sequentially -- observers can access arguments via `event.getInvokeArgs()`
-4. After all observers are notified, the invoke arguments are cleared
+1. `notify(args)` is called, iterating over all observers
+2. Each observer's `update(event, args)` is awaited sequentially — observers receive the arguments as the second `args` parameter
+3. After all observers complete, the call resolves
+
+> **Note:** `event.getInvokeArgs()` is **deprecated** and always returns `[]`. Custom `Observer` implementations should read invoke arguments from the `args` parameter of `update(subject, args)` instead.
 
 ### Example
 

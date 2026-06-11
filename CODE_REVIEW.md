@@ -175,3 +175,13 @@ The whole chain is constructible: `addState("")` builds (state names are never v
   }
 ]
 ```
+
+---
+
+## Resolution
+
+All 10 ranked correctness findings, the 3 confirmed below-cut findings, and all cleanup
+items were addressed on branch `fix/code-review-v3.0.1` (Tasks 1–15). A documentation
+sweep (Task 16) updated `docs/core.md`, `docs/interfaces.md`, `docs/observers.md`,
+`README.md`, and added `docs/migration/v3.0.1-behavior-changes.md` describing the
+behavior changes and their semver implications.
