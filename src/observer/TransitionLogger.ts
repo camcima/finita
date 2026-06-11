@@ -1,21 +1,7 @@
 import type { AfterTransitionObserver } from "../interfaces/AfterTransitionObserverInterface.js";
 import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js";
 import type { LoggerInterface } from "../interfaces/LoggerInterface.js";
-import type { Named } from "../interfaces/Named.js";
-
-function isNamed(obj: unknown): obj is Named {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "getName" in obj &&
-    typeof (obj as Named).getName === "function"
-  );
-}
-
-function asString(obj: unknown): string {
-  if (isNamed(obj)) return obj.getName();
-  return String(obj);
-}
+import { nameOrString } from "../util/index.js";
 
 export class TransitionLogger<
   TSubject = unknown,
@@ -31,7 +17,7 @@ export class TransitionLogger<
   notify(frame: TransitionFrame<TSubject>): void {
     let message = "Transition";
 
-    message += ` from "${asString(frame.fromState)}" to "${asString(frame.toState)}"`;
+    message += ` from "${nameOrString(frame.fromState)}" to "${nameOrString(frame.toState)}"`;
 
     const eventName = frame.event ? frame.event.getName() : null;
     const conditionName = frame.condition ? frame.condition.getName() : null;

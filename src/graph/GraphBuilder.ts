@@ -1,7 +1,7 @@
 import type { StateInterface } from "../interfaces/StateInterface.js";
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import type { StateCollectionInterface } from "../interfaces/StateCollectionInterface.js";
-import type { Named } from "../interfaces/Named.js";
+import { nameOrString } from "../util/index.js";
 
 export interface GraphNode {
   id: string;
@@ -21,15 +21,6 @@ export interface Graph {
   edges: GraphEdge[];
 }
 
-function isNamed(obj: unknown): obj is Named {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "getName" in obj &&
-    typeof (obj as Named).getName === "function"
-  );
-}
-
 function escapeDotString(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
@@ -46,13 +37,6 @@ function toMermaidId(name: string): string {
 
 function escapeMermaidLabel(str: string): string {
   return str.replace(/\\/g, "#92;").replace(/"/g, "#quot;");
-}
-
-function convertToString(obj: unknown): string {
-  if (isNamed(obj)) {
-    return obj.getName();
-  }
-  return String(obj);
 }
 
 export interface DotOptions {
@@ -90,7 +74,7 @@ export class GraphBuilder {
         const event = state.getEvent(eventName);
         const observerNames: string[] = [];
         for (const observer of event.getObservers()) {
-          observerNames.push(convertToString(observer));
+          observerNames.push(nameOrString(observer));
         }
         if (observerNames.length > 0) {
           parts.push(`C: ${observerNames.join(", ")}`);
