@@ -179,7 +179,11 @@ export class Statemachine<
     // mutex implementations (database advisory locks, redis SET NX, etc.)
     // are not idempotent and will fail on the second acquire. We only
     // release in this method if we acquired in this method.
+    //
+    // The caller's promise settles only AFTER the release completes, so
+    // `await sm.triggerEvent(...)` guarantees the lock is free again.
     let acquiredHere = false;
+    let failure: { err: unknown } | null = null;
     try {
       if (!this.mutex.isAcquired()) {
         if (!(await this.mutex.acquireLock())) {
@@ -192,9 +196,8 @@ export class Statemachine<
         op.eventName !== null ? this.resolveEvent(op.eventName) : null;
 
       await this.processOperation(event, op.context);
-      op.resolve();
     } catch (err) {
-      op.reject(err);
+      failure = { err };
     } finally {
       if (acquiredHere && this.autoreleaseLock) {
         try {
@@ -203,6 +206,11 @@ export class Statemachine<
           // releaseLock errors must not mask the operation outcome.
         }
       }
+    }
+    if (failure) {
+      op.reject(failure.err);
+    } else {
+      op.resolve();
     }
   }
 
