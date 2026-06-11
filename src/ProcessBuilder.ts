@@ -195,22 +195,31 @@ export class ProcessBuilder<TSubject = unknown> {
     }
   }
 
+  /** Transition identity: (fromState, eventName, toState). Used by both the
+   *  conflict check and the build-time dedup — keep them in lockstep. */
+  private static transitionKey(t: {
+    fromState: string;
+    eventName: string | null;
+    toState: string;
+  }): string {
+    return `${t.fromState}\x00${t.eventName ?? ""}\x00${t.toState}`;
+  }
+
   private validateNoConflictingDuplicates(): void {
     // Identity key: (fromState, eventName, toState).
-    // Same condition reference → dedup (idempotent re-declaration).
-    // Different condition references (including same-name-different-object) →
-    // conflict (DuplicateTransitionError). We cannot introspect callable
-    // bodies to compare logic, so different object identity is treated as
-    // different logic — closes original review #6.
+    // Same condition reference AND same weight → dedup (idempotent
+    // re-declaration). Anything else → conflict. We cannot introspect
+    // callable bodies to compare logic, so different object identity is
+    // treated as different logic.
     const seen = new Map<string, TransitionSpec<TSubject>>();
     for (const t of this.transitionSpecs) {
-      const key = `${t.fromState}\x00${t.eventName ?? ""}\x00${t.toState}`;
+      const key = ProcessBuilder.transitionKey(t);
       const existing = seen.get(key);
       if (!existing) {
         seen.set(key, t);
         continue;
       }
-      if (existing.condition !== t.condition) {
+      if (existing.condition !== t.condition || existing.weight !== t.weight) {
         throw new DuplicateTransitionError({
           fromState: t.fromState,
           toState: t.toState,
@@ -219,9 +228,11 @@ export class ProcessBuilder<TSubject = unknown> {
             ? existing.condition.getName()
             : null,
           newConditionName: t.condition ? t.condition.getName() : null,
+          existingWeight: existing.weight,
+          newWeight: t.weight,
         });
       }
-      // Same identity AND same condition instance → dedup silently.
+      // Same identity, same condition instance, same weight → dedup silently.
     }
   }
 
@@ -270,23 +281,9 @@ export class ProcessBuilder<TSubject = unknown> {
     }
 
     // Phase 2: build Transitions targeting Phase-1 States, then attach.
-    // Dedup-key uses object identity for the condition (not name), matching
-    // validateNoConflictingDuplicates: same reference dedups, different
-    // references are treated as different logic.
+    // validateNoConflictingDuplicates already guaranteed that specs sharing
+    // the identity key are exact duplicates, so a plain key dedup suffices.
     const dedupSeen = new Set<string>();
-    const conditionId = new Map<ConditionInterface<TSubject>, number>();
-    let nextConditionId = 0;
-    const idForCondition = (
-      cond: ConditionInterface<TSubject> | null,
-    ): string => {
-      if (cond === null) return "";
-      let id = conditionId.get(cond);
-      if (id === undefined) {
-        id = ++nextConditionId;
-        conditionId.set(cond, id);
-      }
-      return String(id);
-    };
     const transitionsByState = new Map<
       string,
       TransitionInterface<TSubject>[]
@@ -295,7 +292,7 @@ export class ProcessBuilder<TSubject = unknown> {
       transitionsByState.set(spec.name, []);
     }
     for (const tSpec of this.transitionSpecs) {
-      const dedupKey = `${tSpec.fromState}\x00${tSpec.eventName ?? ""}\x00${tSpec.toState}\x00${idForCondition(tSpec.condition)}`;
+      const dedupKey = ProcessBuilder.transitionKey(tSpec);
       if (dedupSeen.has(dedupKey)) continue;
       dedupSeen.add(dedupKey);
       const targetState = built.get(tSpec.toState)!;
