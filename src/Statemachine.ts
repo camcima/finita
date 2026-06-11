@@ -14,7 +14,6 @@ import type { TransitionFrame } from "./interfaces/TransitionFrameInterface.js";
 import type { StatemachineOptions } from "./interfaces/StatemachineOptions.js";
 import { OneOrNoneActiveTransition } from "./selector/OneOrNoneActiveTransition.js";
 import { NullMutex } from "./mutex/NullMutex.js";
-import { Dispatcher } from "./internal/Dispatcher.js";
 import { OperationQueue } from "./internal/OperationQueue.js";
 import type { QueuedOperation } from "./internal/OperationQueue.js";
 import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
@@ -280,9 +279,8 @@ export class Statemachine<
     // automatic transitions in the iteration loop have event=null and don't
     // re-trigger this dispatch.
     if (event) {
-      const dispatcher = new Dispatcher();
-      dispatcher.dispatch(event, [this.subject, context]);
-      await this.guardSync(() => dispatcher.invoke());
+      const userEvent = event; // const capture for the closure (event is a mutable let)
+      await this.guardSync(() => userEvent.invoke(this.subject, context));
     }
 
     while (true) {

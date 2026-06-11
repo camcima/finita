@@ -1,5 +1,4 @@
 import type { Observer, ObservableSubject } from "../interfaces/Observer.js";
-import type { EventInterface } from "../interfaces/EventInterface.js";
 import type { MaybePromise } from "../MaybePromise.js";
 
 /**
@@ -16,10 +15,12 @@ export class CallbackObserver implements Observer {
     this.callback = callback;
   }
 
-  update(subject: ObservableSubject): MaybePromise<void> {
-    const event = subject as EventInterface;
-    if (typeof event.getInvokeArgs === "function") {
-      return this.callback(...event.getInvokeArgs());
+  update(
+    subject: ObservableSubject,
+    args?: readonly unknown[],
+  ): MaybePromise<void> {
+    if (args !== undefined && args.length > 0) {
+      return this.callback(...args);
     }
     return this.callback(subject);
   }
