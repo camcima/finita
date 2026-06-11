@@ -58,7 +58,13 @@ export class Statemachine<
       options.transitionSelector ?? new OneOrNoneActiveTransition<TSubject>();
     this.mutex = options.mutex ?? new NullMutex();
     this.autoreleaseLock = options.autoreleaseLock ?? true;
-    this.maxAutomaticHops = options.maxAutomaticHops ?? 100;
+    const hops = options.maxAutomaticHops ?? 100;
+    if (!Number.isInteger(hops) || hops < 1) {
+      throw new RangeError(
+        `maxAutomaticHops must be a positive integer; got ${String(options.maxAutomaticHops)}`,
+      );
+    }
+    this.maxAutomaticHops = hops;
   }
 
   // --- public getters ---

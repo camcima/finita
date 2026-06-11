@@ -48,4 +48,21 @@ describe("automatic transition loops", () => {
       AutomaticTransitionCycleError,
     );
   });
+
+  it("rejects a non-positive maxAutomaticHops at construction", () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    expect(
+      () => new Statemachine({}, process, { maxAutomaticHops: 0 }),
+    ).toThrow(RangeError);
+    expect(
+      () => new Statemachine({}, process, { maxAutomaticHops: -5 }),
+    ).toThrow(RangeError);
+    expect(
+      () => new Statemachine({}, process, { maxAutomaticHops: 2.5 }),
+    ).toThrow(RangeError);
+  });
 });

@@ -416,7 +416,7 @@ Thrown by `Statemachine` when the number of consecutive automatic (eventless) tr
 
 **Partial-commit caveat:** any transitions already committed before the limit was hit are **not** rolled back. Observers (e.g. persistence layers) attached to those hops will have already fired.
 
-To allow a longer but still bounded loop, pass a higher limit: `new Statemachine(subject, process, { maxAutomaticHops: 500 })`.
+Concretely, the error is thrown on the automatic hop _after_ `maxAutomaticHops` automatic transitions have already committed (the check is `> maxAutomaticHops`). To allow a longer but still bounded loop, pass a higher limit: `new Statemachine(subject, process, { maxAutomaticHops: 500 })`. The value must be a positive integer; constructing a `Statemachine` with a value below `1` (or a non-integer) throws a `RangeError`.
 
 ### Properties
 
