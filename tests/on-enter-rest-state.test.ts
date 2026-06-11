@@ -1,5 +1,27 @@
 import { describe, it, expect } from "vitest";
 import { ProcessBuilder, Statemachine, OnEnterObserver } from "../src/index.js";
+import type { MutexInterface } from "../src/index.js";
+
+class CountingMutex implements MutexInterface {
+  acquireCount = 0;
+  private acquired = false;
+  acquireLock(): boolean {
+    this.acquireCount++;
+    if (this.acquired) return false;
+    this.acquired = true;
+    return true;
+  }
+  releaseLock(): boolean {
+    this.acquired = false;
+    return true;
+  }
+  isAcquired(): boolean {
+    return this.acquired;
+  }
+  isLocked(): boolean {
+    return this.acquired;
+  }
+}
 
 describe("OnEnterObserver and automatic follow-on transitions", () => {
   it("fires onEnter for the state the machine comes to rest in", async () => {
@@ -94,5 +116,36 @@ describe("OnEnterObserver and automatic follow-on transitions", () => {
     expect(fired).toEqual(["c->c2"]);
     // The machine must end in c2 (via c's correct onEnter), never in b2.
     expect(sm.getCurrentState().getName()).toBe("c2");
+  });
+
+  it("skips the stale onEnter op before acquiring the lock (no wasted lock/error)", async () => {
+    // a --evt--> b (b declares onEnter: b --onEnter--> d); b --auto--> c (c has NO onEnter).
+    // The machine passes through b to c. b's enqueued onEnter must be skipped
+    // BEFORE acquiring the lock. The unfixed code instead acquires the lock for
+    // it and then swallows a WrongEventForStateError — an extra acquireLock call.
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addState("c")
+      .addState("d")
+      .addTransition("a", "b", { event: "evt" })
+      .addTransition("b", "c") // automatic
+      .addTransition("b", "d", { event: "onEnter" })
+      .build();
+
+    const mutex = new CountingMutex();
+    const sm = new Statemachine({}, process, { mutex });
+    sm.attachAfter(new OnEnterObserver());
+
+    await sm.triggerEvent("evt");
+    // checkTransitions queues BEHIND the stale onEnter op; awaiting it forces a
+    // full FIFO drain so the stale op has definitely been processed/skipped.
+    await sm.checkTransitions();
+
+    // Fixed: evt acquires once, stale onEnter is skipped (no acquire),
+    // checkTransitions acquires once → 2 total.
+    // Unfixed: evt + stale-onEnter(acquires, then throws) + checkTransitions → 3.
+    expect(mutex.acquireCount).toBe(2);
+    expect(sm.getCurrentState().getName()).toBe("c");
   });
 });
