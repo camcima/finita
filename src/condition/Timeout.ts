@@ -1,5 +1,6 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
 import type { LastStateHasChangedDateInterface } from "../interfaces/LastStateHasChangedDateInterface.js";
+import { InvalidSubjectError } from "../error/InvalidSubjectError.js";
 
 function isLastStateHasChangedDate(
   obj: unknown,
@@ -33,14 +34,16 @@ export class Timeout implements ConditionInterface {
     if (isLastStateHasChangedDate(subject)) {
       return subject.getLastStateHasChangedDate();
     }
-    throw new Error("Subject must implement LastStateHasChangedDateInterface");
+    throw new InvalidSubjectError("LastStateHasChangedDateInterface", [
+      "getLastStateHasChangedDate",
+    ]);
   }
 
   checkCondition(subject: unknown, context: Map<string, unknown>): boolean {
-    const date = new Date(
-      this.getLastStateHasChangedDate(subject, context).getTime(),
+    return (
+      this.getLastStateHasChangedDate(subject, context).getTime() +
+        this.timeoutMs <=
+      Date.now()
     );
-    date.setTime(date.getTime() + this.timeoutMs);
-    return date <= new Date();
   }
 }
