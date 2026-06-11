@@ -25,6 +25,8 @@ describe("TransitionFrame.subject", () => {
     });
 
     await sm.triggerEvent("go");
-    expect(seen).toEqual([subject, subject]);
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toBe(subject);
+    expect(seen[1]).toBe(subject);
   });
 });

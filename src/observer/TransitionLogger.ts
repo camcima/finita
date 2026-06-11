@@ -41,6 +41,8 @@ export class TransitionLogger<
       if (conditionName) message += ` condition "${conditionName}"`;
     }
 
+    // frame.subject is intentionally omitted from the log context — callers
+    // who need subject identity attach a custom observer that closes over it.
     this.logger.log(this.loggerLevel, message, {
       fromState: frame.fromState,
       toState: frame.toState,
