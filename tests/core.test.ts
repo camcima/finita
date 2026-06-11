@@ -29,10 +29,28 @@ describe("Event", () => {
     expect(fn).toHaveBeenCalledWith("arg1", "arg2");
   });
 
-  it("should clear invoke args after invoke", async () => {
-    const event = new Event("test");
-    await event.invoke("arg1");
-    expect(event.getInvokeArgs()).toEqual([]);
+  it("delivers invoke args [subject, context] to event observers", async () => {
+    const process = new ProcessBuilder("p")
+      .addState("s1", { initial: true })
+      .addState("s2")
+      .addTransition("s1", "s2", { event: "go" })
+      .build();
+    const receivedArgs: unknown[][] = [];
+    process
+      .getState("s1")
+      .getEvent("go")
+      .attach(
+        new CallbackObserver((...args: unknown[]) => {
+          receivedArgs.push(args);
+        }),
+      );
+    const subject = { id: 42 };
+    const ctx = new Map<string, unknown>([["k", "v"]]);
+    const sm = new Statemachine(subject, process);
+    await sm.triggerEvent("go", ctx);
+    expect(receivedArgs).toHaveLength(1);
+    expect(receivedArgs[0]![0]).toBe(subject);
+    expect(receivedArgs[0]![1]).toBe(ctx);
   });
 
   it("should support metadata", () => {

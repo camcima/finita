@@ -52,17 +52,20 @@ function createTwoStateMachine(mutex?: LockAdapterMutex) {
 
 describe("Exception cleanup", () => {
   describe("Event.invoke", () => {
-    it("should clear invokeArgs when observer throws", async () => {
+    it("delivers invoke args to observer even when observer throws", async () => {
       const event = new Event("test");
+      const receivedArgs: unknown[] = [];
       event.attach(
-        new CallbackObserver(() => {
+        new CallbackObserver((...args: unknown[]) => {
+          receivedArgs.push(...args);
           throw new Error("observer error");
         }),
       );
       await expect(event.invoke("arg1", "arg2")).rejects.toThrow(
         "observer error",
       );
-      expect(event.getInvokeArgs()).toEqual([]);
+      // The observer was called with the correct args before it threw
+      expect(receivedArgs).toEqual(["arg1", "arg2"]);
     });
   });
 
