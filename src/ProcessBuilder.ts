@@ -60,6 +60,9 @@ export class ProcessBuilder<TSubject = unknown> {
     if (this.stateSpecs.has(name)) {
       throw new DuplicateStateError(name);
     }
+    this.validateName("invalidStateName", name, `addState("${name}")`, {
+      stateName: name,
+    });
     this.stateSpecs.set(name, {
       name,
       initial: options.initial === true,
@@ -78,25 +81,21 @@ export class ProcessBuilder<TSubject = unknown> {
     }
     let eventName: string | null = null;
     if (options.event !== undefined) {
-      const raw = options.event;
-      if (raw.trim() === "" || raw !== raw.trim()) {
-        throw new GraphValidationError(
-          "invalidEventName",
-          `addTransition called with an empty or whitespace-padded event name from "${fromState}" to "${toState}"`,
-          { fromState, toState, eventName: raw },
-        );
-      }
-      eventName = raw;
+      this.validateName(
+        "invalidEventName",
+        options.event,
+        `addTransition called with an invalid event name from "${fromState}" to "${toState}"`,
+        { fromState, toState, eventName: options.event },
+      );
+      eventName = options.event;
     }
     if (options.condition) {
-      const conditionName = options.condition.getName();
-      if (conditionName.trim() === "") {
-        throw new GraphValidationError(
-          "invalidConditionName",
-          `addTransition called with an empty/whitespace condition name from "${fromState}" to "${toState}"`,
-          { fromState, toState, conditionName },
-        );
-      }
+      this.validateName(
+        "invalidConditionName",
+        options.condition.getName(),
+        `addTransition called with an invalid condition name from "${fromState}" to "${toState}"`,
+        { fromState, toState, conditionName: options.condition.getName() },
+      );
     }
     this.transitionSpecs.push({
       fromState,
@@ -140,6 +139,22 @@ export class ProcessBuilder<TSubject = unknown> {
   }
 
   // --- private helpers ---
+
+  /** One name rule for every named entity: non-empty, no leading/trailing whitespace. */
+  private validateName(
+    code: "invalidStateName" | "invalidEventName" | "invalidConditionName",
+    raw: string,
+    description: string,
+    details: Record<string, unknown>,
+  ): void {
+    if (raw.trim() === "" || raw !== raw.trim()) {
+      throw new GraphValidationError(
+        code,
+        `${description}: name ${JSON.stringify(raw)} is empty or whitespace-padded`,
+        details,
+      );
+    }
+  }
 
   private validateInitialState(): void {
     const initials = Array.from(this.stateSpecs.values()).filter(
