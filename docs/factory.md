@@ -89,7 +89,7 @@ const factory = new Factory(
 
 // Configure
 factory.setTransitionSelector(new ScoreTransition());
-factory.attachAfterObserver(new StatefulStatusChanger(order1)); // subject injected at construction
+factory.attachAfterObserver(new StatefulStatusChanger()); // writes to frame.subject — safe to share across machines
 factory.attachAfterObserver(new TransitionLogger(logger));
 
 // Create state machines -- all configuration is applied automatically
@@ -320,8 +320,11 @@ const factory = new Factory<Article>(
 
 factory.setTransitionSelector(new ScoreTransition<Article>());
 
-// 3. Register observers -- StatefulStatusChanger requires the subject at construction;
-//    when used with Factory, pass the subject inside createStatemachine or use a wrapper
+// 3. Register observers -- StatefulStatusChanger with no argument writes to
+//    frame.subject automatically, so one instance is safe to share across all
+//    machines the factory creates (recommended). Pass an explicit subject only
+//    when you need to pin a specific object.
+factory.attachAfterObserver(new StatefulStatusChanger()); // writes to frame.subject
 factory.attachAfterObserver(new OnEnterObserver());
 factory.attachAfterObserver(new TransitionLogger(logger));
 
@@ -332,9 +335,7 @@ factory.setMutexFactory(
 
 // 5. Use the factory -- returns StatemachineInterface<Article>
 async function getStatemachine(article: Article) {
-  const sm = await factory.createStatemachine(article);
-  sm.attachAfter(new StatefulStatusChanger(article));
-  return sm;
+  return factory.createStatemachine(article);
 }
 
 // Create or restore state machines for any article

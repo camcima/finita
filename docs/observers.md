@@ -186,12 +186,12 @@ On every state change, this observer calls `subject.setCurrentStateName()` with 
 ### Constructor
 
 ```typescript
-new StatefulStatusChanger<TSubject extends StatefulInterface>(subject: TSubject)
+new StatefulStatusChanger<TSubject extends StatefulInterface>(subject?: TSubject)
 ```
 
-| Parameter | Type                                 | Description                |
-| --------- | ------------------------------------ | -------------------------- |
-| `subject` | `TSubject extends StatefulInterface` | The subject to synchronize |
+| Parameter | Type                                 | Description                                                                                                                                                                                                                                              |
+| --------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subject` | `TSubject extends StatefulInterface` | Optional. When omitted (recommended with `Factory`), the observer writes to `frame.subject` — the subject of the machine that fired the transition. When provided, the observer always writes to this specific object regardless of which machine fired. |
 
 ### Required Subject Interface
 
@@ -244,7 +244,8 @@ console.log(order.status); // 'shipped'
 
 - You need the subject's status property to stay in sync with the state machine
 - You want to persist state changes to a database through the subject's setter
-- You're using the `Factory` pattern with `StatefulStateNameDetector` to restore state machines from persisted state
+- **With `Factory` (recommended):** call `new StatefulStatusChanger()` with no argument and register it via `factory.attachAfterObserver(...)`. The observer writes to `frame.subject`, so one instance serves every machine the factory creates — each machine's transitions update its own subject.
+- **Pinning a specific object:** call `new StatefulStatusChanger(subject)` with an explicit subject when you want all transitions (regardless of which machine fires them) to update that one object.
 
 ---
 
