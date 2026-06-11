@@ -21,6 +21,7 @@ import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
+import { ReentrancyError } from "./error/ReentrancyError.js";
 
 export class Statemachine<
   TSubject = unknown,
@@ -37,6 +38,7 @@ export class Statemachine<
 
   private readonly queue = new OperationQueue();
   private running = false;
+  private inSyncCallback = false;
 
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
@@ -128,15 +130,38 @@ export class Statemachine<
   // --- public top-level operations ---
 
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void> {
+    this.assertNotReentrant(`triggerEvent("${name}")`);
     return new Promise<void>((resolve, reject) => {
       this.enqueueOperation(name, context, resolve, reject);
     });
   }
 
   checkTransitions(context?: Map<string, unknown>): Promise<void> {
+    this.assertNotReentrant("checkTransitions()");
     return new Promise<void>((resolve, reject) => {
       this.enqueueOperation(null, context, resolve, reject);
     });
+  }
+
+  /** Runs fn with the re-entrancy flag set for its SYNCHRONOUS portion only:
+   *  the flag is cleared as soon as fn returns (before any promise it returned
+   *  is awaited), so concurrent external callers are never affected. This
+   *  catches triggerEvent/checkTransitions calls made before a callback's first
+   *  await; calls made after a prior await are not detectable without
+   *  AsyncLocalStorage (Node-only) and will still deadlock — a documented gap. */
+  private guardSync<T>(fn: () => T): T {
+    this.inSyncCallback = true;
+    try {
+      return fn();
+    } finally {
+      this.inSyncCallback = false;
+    }
+  }
+
+  private assertNotReentrant(operation: string): void {
+    if (this.inSyncCallback) {
+      throw new ReentrancyError(operation);
+    }
   }
 
   /** Single entry point to the operation queue — every enqueue kicks the runner. */
@@ -249,16 +274,18 @@ export class Statemachine<
     if (event) {
       const dispatcher = new Dispatcher();
       dispatcher.dispatch(event, [this.subject, context]);
-      await dispatcher.invoke();
+      await this.guardSync(() => dispatcher.invoke());
     }
 
     while (true) {
       const transitions = this.currentState.getTransitions();
-      const active = await ActiveTransitionFilter.filter(
-        transitions,
-        this.subject,
-        context,
-        event ?? undefined,
+      const active = await this.guardSync(() =>
+        ActiveTransitionFilter.filter(
+          transitions,
+          this.subject,
+          context,
+          event ?? undefined,
+        ),
       );
       const selected = this.transitionSelector.selectTransition(
         active,
@@ -297,7 +324,7 @@ export class Statemachine<
         // so observers that detach (themselves or others) during notify
         // can't shift the live array under the iterator.
         for (const observer of [...this.beforeObservers]) {
-          await observer.notify(frame);
+          await this.guardSync(() => observer.notify(frame));
         }
 
         // Commit.
@@ -324,7 +351,7 @@ export class Statemachine<
         const errors: unknown[] = [];
         for (const observer of [...this.afterObservers]) {
           try {
-            await observer.notify(frame, enqueueCtx);
+            await this.guardSync(() => observer.notify(frame, enqueueCtx));
           } catch (err) {
             errors.push(err);
           }

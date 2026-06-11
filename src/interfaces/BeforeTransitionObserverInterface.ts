@@ -7,7 +7,9 @@ import type { ProposedTransitionFrame } from "./TransitionFrameInterface.js";
  * the thrown error.
  *
  * Implementations must be pure relative to the FSM: they MUST NOT call
- * triggerEvent / checkTransitions on the same Statemachine. There is no
+ * triggerEvent / checkTransitions on the same Statemachine. Doing so throws
+ * ReentrancyError when the call happens before the observer's first await;
+ * calls made after an await cannot be detected and will deadlock. There is no
  * enqueue handle in the before phase by design — vetoes and validations
  * complete synchronously per observer; chained behaviour belongs in
  * AfterTransitionObserver.

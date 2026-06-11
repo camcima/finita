@@ -121,6 +121,7 @@ export {
   InvalidSubjectError,
   AmbiguousTransitionError,
   AutomaticTransitionCycleError,
+  ReentrancyError,
 } from "./error/index.js";
 export type {
   GraphValidationCode,
