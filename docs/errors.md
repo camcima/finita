@@ -17,6 +17,7 @@ Custom error classes thrown by the state machine.
 - [InvalidSubjectError](#invalidsubjecterror)
 - [AmbiguousTransitionError](#ambiguoustransitionerror)
 - [AutomaticTransitionCycleError](#automatictransitioncycleerror)
+- [ReentrancyError](#reentrancyerror)
 
 ---
 
@@ -426,3 +427,28 @@ Concretely, the error is thrown on the automatic hop _after_ `maxAutomaticHops` 
 | `stateName` | `string`                     | The last target state when the hop limit was exceeded |
 | `hopLimit`  | `number`                     | The `maxAutomaticHops` value that was exceeded        |
 | `name`      | `string`                     | `'AutomaticTransitionCycleError'`                     |
+
+---
+
+## ReentrancyError
+
+**Import:** `import { ReentrancyError } from '@camcima/finita'`
+
+Rejects the promise returned by `triggerEvent()` / `checkTransitions()` when either is called from inside an observer, condition, or transition selector of the **same** `Statemachine` — before the callback's first `await`. Awaiting such a call would deadlock permanently: the machine runs one operation at a time, and the runner is blocked waiting for your callback to finish.
+
+**Detection scope:** only the _synchronous portion_ of a callback is guarded. A re-entrant call made **after** a prior `await` inside the callback cannot be detected (that would require Node-only `AsyncLocalStorage`) and will still deadlock silently. Keep re-entrant calls out of callbacks entirely.
+
+**Note:** the error surfaces as a promise _rejection_, not a synchronous throw. A fire-and-forget `void sm.triggerEvent(...)` from inside a synchronous callback therefore becomes an **unhandled promise rejection** — see the alternatives below.
+
+**Alternatives:**
+
+- In an after-observer, use the `EnqueueContext` passed to `notify()` to chain events safely.
+- In other callbacks (before-observers, conditions, selectors), defer the call out of the synchronous path: `queueMicrotask(() => void sm.triggerEvent("next"))`.
+
+### Properties
+
+| Property  | Type           | Description                                            |
+| --------- | -------------- | ------------------------------------------------------ |
+| `code`    | `"reentrancy"` | Discriminator                                          |
+| `message` | `string`       | Names the offending call and explains the alternatives |
+| `name`    | `string`       | `'ReentrancyError'`                                    |
