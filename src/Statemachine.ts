@@ -243,8 +243,12 @@ export class Statemachine<
       if (acquiredHere && this.autoreleaseLock) {
         try {
           await this.mutex.releaseLock();
-        } catch {
-          // releaseLock errors must not mask the operation outcome.
+        } catch (err) {
+          // A release failure must not mask an operation error, but when the
+          // operation succeeded the caller must learn the lock may still be
+          // held — otherwise every later operation silently piggybacks on
+          // (and never releases) the stuck lock.
+          if (!failure) failure = { err };
         }
       }
     }
@@ -294,8 +298,8 @@ export class Statemachine<
           event ?? undefined,
         ),
       );
-      const selected = this.transitionSelector.selectTransition(
-        active,
+      const selected = this.guardSync(() =>
+        this.transitionSelector.selectTransition(active),
       ) as TransitionInterface<TSubject> | null;
 
       if (!selected) {

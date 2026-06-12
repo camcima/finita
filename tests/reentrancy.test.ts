@@ -5,7 +5,10 @@ import {
   ReentrancyError,
   CallbackCondition,
 } from "../src/index.js";
-import type { TransitionFrame } from "../src/index.js";
+import type {
+  TransitionFrame,
+  TransitionSelectorInterface,
+} from "../src/index.js";
 
 describe("re-entrant triggerEvent from an observer", () => {
   it("throws ReentrancyError instead of deadlocking, machine stays usable", async () => {
@@ -48,6 +51,33 @@ describe("re-entrant triggerEvent from an observer", () => {
     sm0.sm = sm;
 
     await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(ReentrancyError);
+  });
+
+  it("flags a custom transition selector that re-enters the machine", async () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+
+    const holder: { sm?: Statemachine } = {};
+    let captured: unknown = null;
+    const selector: TransitionSelectorInterface = {
+      selectTransition(transitions) {
+        // Synchronous re-entrant call from inside the selector — must reject.
+        holder.sm!.checkTransitions().catch((e: unknown) => {
+          captured = e;
+        });
+        for (const t of transitions) return t;
+        return null;
+      },
+    };
+    const sm = new Statemachine({}, process, { transitionSelector: selector });
+    holder.sm = sm;
+
+    await sm.triggerEvent("go");
+    expect(captured).toBeInstanceOf(ReentrancyError);
+    expect(sm.getCurrentState().getName()).toBe("b");
   });
 
   it("does not flag a benign observer that awaits non-reentrant work", async () => {

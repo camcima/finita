@@ -19,11 +19,13 @@ export class CallbackObserver implements Observer {
     subject: ObservableSubject,
     args?: readonly unknown[],
   ): MaybePromise<void> {
-    // Event-invoked path: args is [subject, context] — spread them into the callback.
-    // Direct/legacy path: no args — pass the subject itself as the sole argument.
-    if (args !== undefined && args.length > 0) {
+    // Event-invoked path: args is the invoke argument list — spread it into
+    // the callback. An empty list means the event was invoked with zero args,
+    // so the callback receives zero args (matching pre-v3.1 behavior).
+    if (args !== undefined) {
       return this.callback(...args);
     }
+    // Direct/legacy path: update(subject) with no args — pass the subject.
     return this.callback(subject);
   }
 }
