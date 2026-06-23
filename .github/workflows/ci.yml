@@ -59,9 +59,10 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && matrix.node-version == 22 }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: true
+          report_type: test_results
 
   codeql:
     name: CodeQL
