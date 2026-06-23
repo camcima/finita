@@ -1,7 +1,7 @@
 import type { StateInterface } from "../interfaces/StateInterface.js";
 import type { TransitionInterface } from "../interfaces/TransitionInterface.js";
 import type { StateCollectionInterface } from "../interfaces/StateCollectionInterface.js";
-import type { Named } from "../interfaces/Named.js";
+import { nameOrString } from "../util/index.js";
 
 export interface GraphNode {
   id: string;
@@ -21,17 +21,8 @@ export interface Graph {
   edges: GraphEdge[];
 }
 
-function isNamed(obj: unknown): obj is Named {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "getName" in obj &&
-    typeof (obj as Named).getName === "function"
-  );
-}
-
-function escapeDoubleQuotes(str: string): string {
-  return str.replace(/"/g, '\\"');
+function escapeDotString(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function toMermaidId(name: string): string {
@@ -45,14 +36,7 @@ function toMermaidId(name: string): string {
 }
 
 function escapeMermaidLabel(str: string): string {
-  return str.replace(/"/g, "#quot;");
-}
-
-function convertToString(obj: unknown): string {
-  if (isNamed(obj)) {
-    return obj.getName();
-  }
-  return String(obj);
+  return str.replace(/\\/g, "#92;").replace(/"/g, "#quot;");
 }
 
 export interface DotOptions {
@@ -86,13 +70,15 @@ export class GraphBuilder {
     const eventName = transition.getEventName();
     if (eventName) {
       parts.push(`E: ${eventName}`);
-      const event = state.getEvent(eventName);
-      const observerNames: string[] = [];
-      for (const observer of event.getObservers()) {
-        observerNames.push(convertToString(observer));
-      }
-      if (observerNames.length > 0) {
-        parts.push(`C: ${observerNames.join(", ")}`);
+      if (state.hasEvent(eventName)) {
+        const event = state.getEvent(eventName);
+        const observerNames: string[] = [];
+        for (const observer of event.getObservers()) {
+          observerNames.push(nameOrString(observer));
+        }
+        if (observerNames.length > 0) {
+          parts.push(`C: ${observerNames.join(", ")}`);
+        }
       }
     }
     const conditionName = transition.getConditionName();
@@ -150,13 +136,13 @@ export class GraphBuilder {
     lines.push("digraph {");
     lines.push(`  rankdir=${rankdir};`);
     for (const node of graph.nodes) {
-      const label = escapeDoubleQuotes(node.label);
+      const label = escapeDotString(node.label);
       lines.push(`  "${label}" [label="${label}"];`);
     }
     for (const edge of graph.edges) {
-      const source = escapeDoubleQuotes(edge.source);
-      const target = escapeDoubleQuotes(edge.target);
-      const label = escapeDoubleQuotes(edge.label);
+      const source = escapeDotString(edge.source);
+      const target = escapeDotString(edge.target);
+      const label = escapeDotString(edge.label);
       lines.push(`  "${source}" -> "${target}" [label="${label}"];`);
     }
     lines.push("}");

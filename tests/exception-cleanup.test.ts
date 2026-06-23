@@ -7,6 +7,7 @@ import {
   Tautology,
   OnEnterObserver,
   LockAdapterMutex,
+  AutomaticTransitionCycleError,
 } from "../src/index.js";
 import type {
   AfterTransitionObserver,
@@ -51,17 +52,20 @@ function createTwoStateMachine(mutex?: LockAdapterMutex) {
 
 describe("Exception cleanup", () => {
   describe("Event.invoke", () => {
-    it("should clear invokeArgs when observer throws", async () => {
+    it("delivers invoke args to observer even when observer throws", async () => {
       const event = new Event("test");
+      const receivedArgs: unknown[] = [];
       event.attach(
-        new CallbackObserver(() => {
+        new CallbackObserver((...args: unknown[]) => {
+          receivedArgs.push(...args);
           throw new Error("observer error");
         }),
       );
       await expect(event.invoke("arg1", "arg2")).rejects.toThrow(
         "observer error",
       );
-      expect(event.getInvokeArgs()).toEqual([]);
+      // The observer was called with the correct args before it threw
+      expect(receivedArgs).toEqual(["arg1", "arg2"]);
     });
   });
 
@@ -196,11 +200,13 @@ describe("Exception cleanup", () => {
         .addState("s1", { initial: true })
         .addTransition("s1", "s1", { condition: new Tautology() })
         .build();
-      const sm = new Statemachine({}, process);
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 5 });
 
-      await expect(sm.checkTransitions()).rejects.toThrow(
-        /Automatic transition cycle detected.*"s1"/,
-      );
+      const err = await sm.checkTransitions().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(AutomaticTransitionCycleError);
+      const e = err as AutomaticTransitionCycleError;
+      expect(e.stateName).toBe("s1");
+      expect(e.hopLimit).toBe(5);
     });
 
     it("should throw on automatic self-transition via triggerEvent", async () => {
@@ -211,11 +217,13 @@ describe("Exception cleanup", () => {
         .addTransition("s1", "s2", { event: "go" })
         .addTransition("s2", "s2", { condition: new Tautology() })
         .build();
-      const sm = new Statemachine({}, process);
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 5 });
 
-      await expect(sm.triggerEvent("go")).rejects.toThrow(
-        /Automatic transition cycle detected.*"s2"/,
-      );
+      const err = await sm.triggerEvent("go").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(AutomaticTransitionCycleError);
+      const e = err as AutomaticTransitionCycleError;
+      expect(e.stateName).toBe("s2");
+      expect(e.hopLimit).toBe(5);
     });
 
     it("should throw on multi-state automatic cycle (s1 -> s2 -> s1)", async () => {
@@ -225,15 +233,18 @@ describe("Exception cleanup", () => {
         .addTransition("s1", "s2", { condition: new Tautology() })
         .addTransition("s2", "s1", { condition: new Tautology() })
         .build();
-      const sm = new Statemachine({}, process);
+      // maxAutomaticHops=6: hops 1-6 commit (ending at s1), hop 7 targets s2 and throws.
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 6 });
 
       try {
         await sm.checkTransitions();
         expect.unreachable("should have thrown");
       } catch (e: unknown) {
-        expect(rootCause(e as Error).message).toMatch(
-          /Automatic transition cycle detected.*"s1"/,
-        );
+        const err = rootCause(e as Error);
+        expect(err).toBeInstanceOf(AutomaticTransitionCycleError);
+        const cycle = err as AutomaticTransitionCycleError;
+        expect(cycle.stateName).toBe("s2");
+        expect(cycle.hopLimit).toBe(6);
       }
     });
 
@@ -246,18 +257,21 @@ describe("Exception cleanup", () => {
         .addTransition("s2", "s3", { condition: new Tautology() })
         .addTransition("s3", "s1", { condition: new Tautology() })
         .build();
-      const sm = new Statemachine({}, process);
+      // maxAutomaticHops=6: hops 1-6 commit ending at s1 (full 2 cycles), hop 7 targets s2 and throws.
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 6 });
 
       try {
         await sm.checkTransitions();
         expect.unreachable("should have thrown");
       } catch (e: unknown) {
-        expect(rootCause(e as Error).message).toMatch(
-          /Automatic transition cycle detected.*"s1"/,
-        );
+        const err = rootCause(e as Error);
+        expect(err).toBeInstanceOf(AutomaticTransitionCycleError);
+        const cycle = err as AutomaticTransitionCycleError;
+        expect(cycle.stateName).toBe("s2");
+        expect(cycle.hopLimit).toBe(6);
       }
-      // s1 transitioned to s2, then s3, then tried to go back to s1
-      expect(sm.getCurrentState().getName()).toBe("s3");
+      // 6 hops committed: s2, s3, s1, s2, s3, s1 — last committed state is s1
+      expect(sm.getCurrentState().getName()).toBe("s1");
     });
 
     it("should detect cycle after event-triggered transition", async () => {
@@ -270,15 +284,18 @@ describe("Exception cleanup", () => {
         .addTransition("s2", "s3", { condition: new Tautology() })
         .addTransition("s3", "s2", { condition: new Tautology() })
         .build();
-      const sm = new Statemachine({}, process);
+      // maxAutomaticHops=5: hops 1-5 commit (ending at s3), hop 6 targets s2 and throws.
+      const sm = new Statemachine({}, process, { maxAutomaticHops: 5 });
 
       try {
         await sm.triggerEvent("go");
         expect.unreachable("should have thrown");
       } catch (e: unknown) {
-        expect(rootCause(e as Error).message).toMatch(
-          /Automatic transition cycle detected.*"s2"/,
-        );
+        const err = rootCause(e as Error);
+        expect(err).toBeInstanceOf(AutomaticTransitionCycleError);
+        const cycle = err as AutomaticTransitionCycleError;
+        expect(cycle.stateName).toBe("s2");
+        expect(cycle.hopLimit).toBe(5);
       }
     });
 

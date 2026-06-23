@@ -5,8 +5,6 @@ export class Event implements EventInterface {
   private readonly name: string;
   private readonly observers: Set<Observer> = new Set();
   private readonly metadata: Map<string, unknown> = new Map();
-  private invokeArgs: unknown[] = [];
-
   constructor(name: string) {
     this.name = name;
   }
@@ -15,17 +13,17 @@ export class Event implements EventInterface {
     return this.name;
   }
 
+  /**
+   * @deprecated Always returns []. Invoke args are now passed directly to
+   * Observer.update — reading them from the event was racy when one
+   * Process served multiple Statemachines.
+   */
   getInvokeArgs(): unknown[] {
-    return this.invokeArgs;
+    return [];
   }
 
   async invoke(...args: unknown[]): Promise<void> {
-    this.invokeArgs = args;
-    try {
-      await this.notify();
-    } finally {
-      this.invokeArgs = [];
-    }
+    await this.notify(args);
   }
 
   attach(observer: Observer): void {
@@ -36,9 +34,13 @@ export class Event implements EventInterface {
     this.observers.delete(observer);
   }
 
-  async notify(): Promise<void> {
-    for (const observer of this.observers) {
-      await observer.update(this);
+  async notify(args?: readonly unknown[]): Promise<void> {
+    // Forward args as-is. invoke() always supplies a concrete array (empty when
+    // called with no args), whereas a bare notify() passes undefined — letting
+    // observers distinguish "invoked with zero args" ([]) from "no args
+    // supplied" (undefined), e.g. CallbackObserver's legacy update(subject).
+    for (const observer of [...this.observers]) {
+      await observer.update(this, args);
     }
   }
 

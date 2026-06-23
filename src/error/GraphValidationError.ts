@@ -5,6 +5,7 @@ export type GraphValidationCode =
   | "unknownSource"
   | "missingInitialState"
   | "multipleInitialStates"
+  | "invalidStateName"
   | "invalidEventName"
   | "invalidConditionName"
   | "orphanState";

@@ -148,7 +148,7 @@ classDiagram
 
 Detailed documentation for every component:
 
-- **[Core](https://github.com/camcima/finita/blob/main/docs/core.md)** -- State, Transition, Event, Process, Statemachine, Dispatcher, StateCollection
+- **[Core](https://github.com/camcima/finita/blob/main/docs/core.md)** -- State, Transition, Event, Process, Statemachine
 - **[Conditions](https://github.com/camcima/finita/blob/main/docs/conditions.md)** -- Tautology, Contradiction, CallbackCondition, Timeout, AndComposite, OrComposite, Not
 - **[Observers](https://github.com/camcima/finita/blob/main/docs/observers.md)** -- CallbackObserver, StatefulStatusChanger, OnEnterObserver, TransitionLogger
 - **[Filters](https://github.com/camcima/finita/blob/main/docs/filters.md)** -- ActiveTransitionFilter, FilterStateByEvent, FilterStateByTransition, FilterStateByFinalState, FilterTransitionByEvent

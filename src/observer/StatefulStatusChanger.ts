@@ -5,13 +5,23 @@ import type { StatefulInterface } from "../interfaces/StatefulInterface.js";
 export class StatefulStatusChanger<
   TSubject extends StatefulInterface,
 > implements AfterTransitionObserver<TSubject> {
-  private readonly subject: TSubject;
+  private readonly subject: TSubject | null;
 
-  constructor(subject: TSubject) {
-    this.subject = subject;
+  /**
+   * @param subject Optional explicit subject to write to. When omitted
+   * (recommended), the observer writes to frame.subject — the subject of
+   * whichever machine fired the transition — so a single instance can be
+   * shared safely across every machine a Factory creates.
+   */
+  constructor(subject?: TSubject) {
+    // null sentinel lets `?? frame.subject` in notify() distinguish
+    // "no subject pinned" from any valid subject value.
+    this.subject = subject ?? null;
   }
 
   notify(frame: TransitionFrame<TSubject>): void {
-    this.subject.setCurrentStateName(frame.toState.getName());
+    (this.subject ?? frame.subject).setCurrentStateName(
+      frame.toState.getName(),
+    );
   }
 }

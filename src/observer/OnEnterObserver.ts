@@ -12,6 +12,10 @@ import type { TransitionFrame } from "../interfaces/TransitionFrameInterface.js"
  * top-level operation after the current operation completes. Other
  * after-observers registered after OnEnterObserver still see the original
  * frame, not the chained one.
+ *
+ * The chained event only fires if the machine is still in the entered state
+ * when the queue drains — states passed through transiently by automatic
+ * transitions do not fire onEnter.
  */
 export class OnEnterObserver<
   TSubject = unknown,
@@ -26,7 +30,11 @@ export class OnEnterObserver<
 
   notify(frame: TransitionFrame<TSubject>, ctx: EnqueueContext): void {
     if (frame.toState.hasEvent(this.eventName)) {
-      ctx.enqueue(this.eventName, new Map(frame.context));
+      ctx.enqueue(
+        this.eventName,
+        new Map(frame.context),
+        frame.toState.getName(),
+      );
     }
   }
 }

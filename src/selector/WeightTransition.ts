@@ -20,18 +20,15 @@ export class WeightTransition<
   selectTransition(
     transitions: Iterable<TransitionInterface<TSubject>>,
   ): TransitionInterface<TSubject> | null {
-    let bestTransitions: TransitionInterface<TSubject>[] = [];
-    let bestWeight: number | null = null;
-    for (const transition of transitions) {
+    const all = Array.from(transitions);
+    let maxWeight = Number.NEGATIVE_INFINITY;
+    for (const transition of all) {
       const weight = transition.getWeight();
-      const diff = weight - (bestWeight ?? 0);
-      if (bestWeight === null || diff >= this.epsilon) {
-        bestWeight = weight;
-        bestTransitions = [transition];
-      } else if (Math.abs(diff) < this.epsilon) {
-        bestTransitions.push(transition);
-      }
+      if (weight > maxWeight) maxWeight = weight;
     }
-    return this.innerSelector.selectTransition(bestTransitions);
+    const best = all.filter(
+      (transition) => maxWeight - transition.getWeight() < this.epsilon,
+    );
+    return this.innerSelector.selectTransition(best);
   }
 }

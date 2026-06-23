@@ -11,5 +11,6 @@ export { ProcessNotFoundError } from "./ProcessNotFoundError.js";
 export { InvalidSubjectError } from "./InvalidSubjectError.js";
 export { AmbiguousTransitionError } from "./AmbiguousTransitionError.js";
 export { AutomaticTransitionCycleError } from "./AutomaticTransitionCycleError.js";
+export { ReentrancyError } from "./ReentrancyError.js";
 export type { GraphValidationCode } from "./GraphValidationError.js";
 export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";

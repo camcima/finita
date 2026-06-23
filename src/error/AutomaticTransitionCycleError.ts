@@ -2,16 +2,18 @@ import { FinitaError } from "./FinitaError.js";
 
 export class AutomaticTransitionCycleError extends FinitaError {
   readonly code = "automaticTransitionCycle";
-  readonly targetStateName: string;
-  readonly visitedStateNames: readonly string[];
+  readonly stateName: string;
+  readonly hopLimit: number;
 
-  constructor(targetStateName: string, visitedStateNames: Iterable<string>) {
-    const visited = Array.from(visitedStateNames);
+  constructor(stateName: string, hopLimit: number) {
     super(
-      `Automatic transition cycle detected: state "${targetStateName}" was already visited — this would cause infinite recursion`,
+      `Automatic transitions exceeded ${hopLimit} hops without reaching a quiescent state ` +
+        `(last target: "${stateName}") — the graph is likely looping forever. ` +
+        `Raise maxAutomaticHops if the loop is legitimate and bounded. ` +
+        `Transitions committed before this error are NOT rolled back.`,
     );
     this.name = "AutomaticTransitionCycleError";
-    this.targetStateName = targetStateName;
-    this.visitedStateNames = Object.freeze([...visited]);
+    this.stateName = stateName;
+    this.hopLimit = hopLimit;
   }
 }

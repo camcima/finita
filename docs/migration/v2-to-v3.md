@@ -182,13 +182,19 @@ When multiple after-observers throw, the caller's promise rejects with a standar
 
 ## 11. `StatefulStatusChanger` constructor
 
-`StatefulStatusChanger` now takes the subject at construction:
+`StatefulStatusChanger` no longer uses v2's reflective subject lookup. The subject is now resolved in one of two ways:
 
-```ts
-sm.attachAfter(new StatefulStatusChanger(subject));
-```
+- **No-arg (recommended with `Factory`):** pass no argument and register on the factory. Each machine's transition writes to its own `frame.subject`:
 
-The v2 reflective subject lookup is gone; explicit injection makes the contract typed.
+  ```ts
+  factory.attachAfterObserver(new StatefulStatusChanger());
+  ```
+
+- **Explicit subject:** pin a specific object (useful when attaching directly to a single `Statemachine`):
+
+  ```ts
+  sm.attachAfter(new StatefulStatusChanger(subject));
+  ```
 
 ## 12. Typed errors with a shared `FinitaError` base
 

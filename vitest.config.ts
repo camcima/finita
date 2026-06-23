@@ -7,7 +7,9 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      exclude: ["src/index.ts", "src/interfaces/**"],
+      // index.ts is re-exports only; interfaces/** and MaybePromise.ts are
+      // type-only files with no runtime code to measure.
+      exclude: ["src/index.ts", "src/interfaces/**", "src/MaybePromise.ts"],
       reporter: ["text", "lcov"],
     },
   },

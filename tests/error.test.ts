@@ -103,4 +103,26 @@ describe("DuplicateTransitionError", () => {
     expect(err.message).toContain("hasItems");
     expect(err.message).toContain("isAuthorised");
   });
+
+  it("includes a weight clause only when conflicting weights are provided", () => {
+    const withWeights = new DuplicateTransitionError({
+      fromState: "a",
+      toState: "b",
+      eventName: "go",
+      existingConditionName: null,
+      newConditionName: null,
+      existingWeight: 1,
+      newWeight: 10,
+    });
+    expect(withWeights.message).toContain("existing weight 1 vs new weight 10");
+
+    const withoutWeights = new DuplicateTransitionError({
+      fromState: "a",
+      toState: "b",
+      eventName: "go",
+      existingConditionName: null,
+      newConditionName: null,
+    });
+    expect(withoutWeights.message).not.toContain("weight");
+  });
 });

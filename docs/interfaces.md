@@ -39,7 +39,7 @@ classDiagram
 - [Condition Interface](#condition-interface)
 - [Factory Interfaces](#factory-interfaces)
 - [Mutex Interfaces](#mutex-interfaces)
-- [Dispatcher Interfaces](#dispatcher-interfaces)
+- [Dispatcher Interfaces](#dispatcher-interfaces) _(deprecated)_
 - [Utility Interfaces](#utility-interfaces)
 
 > **Import all types:** `import type { InterfaceName } from '@camcima/finita'`
@@ -104,6 +104,7 @@ Used by: `TransitionInterface`
 
 ```typescript
 interface EventInterface extends Named, Metadata, ObservableSubject {
+  /** @deprecated Always returns []. Read args from Observer.update's args parameter. */
   getInvokeArgs(): unknown[];
   invoke(...args: unknown[]): Promise<void>;
   getMetadataValue(key: string): unknown;
@@ -196,13 +197,23 @@ interface StatemachineInterface<TSubject = unknown> {
 
 ### Observer
 
-Used for **event observers** — attached to `Event` objects on a state. Unchanged from v2.
+Used for **event observers** — attached to `Event` objects on a state.
 
 ```typescript
 interface Observer {
-  update(subject: ObservableSubject): MaybePromise<void>;
+  /**
+   * @param args The arguments the notification was invoked with — for
+   * Statemachine events, [subject, context]. Passed per-call so shared
+   * Event instances carry no per-invocation state.
+   */
+  update(
+    subject: ObservableSubject,
+    args?: readonly unknown[],
+  ): MaybePromise<void>;
 }
 ```
+
+> **v3 change:** The `args` parameter was added so invoke arguments are passed directly to each observer rather than stored on the shared `Event` instance. The `Event.getInvokeArgs()` method is deprecated and always returns `[]`.
 
 ### ObservableSubject
 
@@ -210,7 +221,7 @@ interface Observer {
 interface ObservableSubject {
   attach(observer: Observer): void;
   detach(observer: Observer): void;
-  notify(): Promise<void>;
+  notify(args?: readonly unknown[]): Promise<void>;
   getObservers(): Iterable<Observer>;
 }
 ```
@@ -242,7 +253,15 @@ interface AfterTransitionObserver<TSubject = unknown> {
 
 ```typescript
 interface EnqueueContext {
-  enqueue(event: string, context?: Map<string, unknown>): void;
+  /**
+   * @param ifStateName When provided, the enqueued event is silently skipped
+   * unless the machine is still in that state when the operation is dequeued.
+   */
+  enqueue(
+    event: string,
+    context?: Map<string, unknown>,
+    ifStateName?: string,
+  ): void;
 }
 ```
 
@@ -250,6 +269,8 @@ interface EnqueueContext {
 
 ```typescript
 interface TransitionFrame<TSubject = unknown> {
+  /** The subject this machine drives — identifies whose transition this is. */
+  readonly subject: TSubject;
   readonly fromState: StateInterface;
   readonly toState: StateInterface;
   readonly transition: TransitionInterface<TSubject>;
@@ -260,12 +281,13 @@ interface TransitionFrame<TSubject = unknown> {
   readonly machineName: string | null;
 }
 
-// ProposedTransitionFrame is the same shape — used in before-observers.
-// toState is the proposed target; currentState is still fromState at call time.
-interface ProposedTransitionFrame<
-  TSubject = unknown,
-> extends TransitionFrame<TSubject> {}
+// ProposedTransitionFrame is a type alias for TransitionFrame — used in
+// before-observers. toState is the proposed target; currentState is still
+// fromState at call time.
+type ProposedTransitionFrame<TSubject = unknown> = TransitionFrame<TSubject>;
 ```
+
+> **v3 change:** `subject` was added to `TransitionFrame`. Observers can now identify and write to the correct machine subject directly from the frame, enabling `StatefulStatusChanger` to be registered on a `Factory` without pinning a specific subject.
 
 ---
 
@@ -386,9 +408,12 @@ interface LockAdapterInterface {
 
 ## Dispatcher Interfaces
 
+> **Deprecated.** `DispatcherInterface` and `CallbackInterface` are kept for backward compatibility but are no longer used internally. The `Dispatcher` class has been removed. These types will be removed in v4.
+
 ### CallbackInterface
 
 ```typescript
+/** @deprecated Will be removed in v4. */
 interface CallbackInterface {
   invoke(): MaybePromise<void>;
 }
@@ -397,13 +422,9 @@ interface CallbackInterface {
 ### DispatcherInterface
 
 ```typescript
+/** @deprecated Will be removed in v4. */
 interface DispatcherInterface extends CallbackInterface {
-  dispatch(
-    event: EventInterface,
-    args?: unknown[],
-    onReadyCallback?: CallbackInterface,
-  ): void;
-  isReady(): boolean;
+  dispatch(event: EventInterface, args?: unknown[]): void;
   invoke(): Promise<void>;
 }
 ```

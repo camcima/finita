@@ -17,6 +17,7 @@ Custom error classes thrown by the state machine.
 - [InvalidSubjectError](#invalidsubjecterror)
 - [AmbiguousTransitionError](#ambiguoustransitionerror)
 - [AutomaticTransitionCycleError](#automatictransitioncycleerror)
+- [ReentrancyError](#reentrancyerror)
 
 ---
 
@@ -412,13 +413,42 @@ Thrown by `OneOrNoneActiveTransition.selectTransition(transitions)` when more th
 
 **Import:** `import { AutomaticTransitionCycleError } from '@camcima/finita'`
 
-Thrown by `Statemachine` when an automatic-transition cycle is detected during `triggerEvent` / `checkTransitions`. Indicates the graph would loop forever.
+Thrown by `Statemachine` when the number of consecutive automatic (eventless) transitions in a single operation exceeds the `maxAutomaticHops` limit (default `100`). This guards against genuinely non-terminating automatic loops while still allowing legitimate bounded loops such as condition-terminated retry cycles.
+
+**Partial-commit caveat:** any transitions already committed before the limit was hit are **not** rolled back. Observers (e.g. persistence layers) attached to those hops will have already fired.
+
+Concretely, the error is thrown on the automatic hop _after_ `maxAutomaticHops` automatic transitions have already committed (the check is `> maxAutomaticHops`). To allow a longer but still bounded loop, pass a higher limit: `new Statemachine(subject, process, { maxAutomaticHops: 500 })`. The value must be a positive integer; constructing a `Statemachine` with a value below `1` (or a non-integer) throws a `RangeError`.
 
 ### Properties
 
-| Property            | Type                         | Description                             |
-| ------------------- | ---------------------------- | --------------------------------------- |
-| `code`              | `"automaticTransitionCycle"` | Discriminator                           |
-| `targetStateName`   | `string`                     | The state already visited in this run   |
-| `visitedStateNames` | `readonly string[]`          | The states visited so far in this drive |
-| `name`              | `string`                     | `'AutomaticTransitionCycleError'`       |
+| Property    | Type                         | Description                                           |
+| ----------- | ---------------------------- | ----------------------------------------------------- |
+| `code`      | `"automaticTransitionCycle"` | Discriminator                                         |
+| `stateName` | `string`                     | The last target state when the hop limit was exceeded |
+| `hopLimit`  | `number`                     | The `maxAutomaticHops` value that was exceeded        |
+| `name`      | `string`                     | `'AutomaticTransitionCycleError'`                     |
+
+---
+
+## ReentrancyError
+
+**Import:** `import { ReentrancyError } from '@camcima/finita'`
+
+Rejects the promise returned by `triggerEvent()` / `checkTransitions()` when either is called from inside an observer, condition, or transition selector of the **same** `Statemachine` — before the callback's first `await`. Awaiting such a call would deadlock permanently: the machine runs one operation at a time, and the runner is blocked waiting for your callback to finish.
+
+**Detection scope:** only the _synchronous portion_ of a callback is guarded. A re-entrant call made **after** a prior `await` inside the callback cannot be detected (that would require Node-only `AsyncLocalStorage`) and will still deadlock silently. Keep re-entrant calls out of callbacks entirely.
+
+**Note:** the error surfaces as a promise _rejection_, not a synchronous throw. A fire-and-forget `void sm.triggerEvent(...)` from inside a synchronous callback therefore becomes an **unhandled promise rejection** — see the alternatives below.
+
+**Alternatives:**
+
+- In an after-observer, use the `EnqueueContext` passed to `notify()` to chain events safely.
+- In other callbacks (before-observers, conditions, selectors), defer the call out of the synchronous path: `queueMicrotask(() => void sm.triggerEvent("next"))`.
+
+### Properties
+
+| Property  | Type           | Description                                            |
+| --------- | -------------- | ------------------------------------------------------ |
+| `code`    | `"reentrancy"` | Discriminator                                          |
+| `message` | `string`       | Names the offending call and explains the alternatives |
+| `name`    | `string`       | `'ReentrancyError'`                                    |

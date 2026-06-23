@@ -1,9 +1,9 @@
-export type OperationKind = "triggerEvent" | "checkTransitions";
-
 export interface QueuedOperation {
-  kind: OperationKind;
+  /** Event name for triggerEvent operations; null for checkTransitions. */
   eventName: string | null;
   context: Map<string, unknown>;
+  /** When set, the op is silently skipped unless the machine is still in this state when the op is dispatched (top of runOperation). */
+  ifStateName?: string;
   resolve: () => void;
   reject: (err: unknown) => void;
 }

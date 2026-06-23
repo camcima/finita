@@ -1,22 +1,15 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
+import { CompositeCondition } from "./CompositeCondition.js";
 
 export class OrComposite<
   TSubject = unknown,
-> implements ConditionInterface<TSubject> {
-  private readonly conditions: ConditionInterface<TSubject>[] = [];
-
+> extends CompositeCondition<TSubject> {
   constructor(condition: ConditionInterface<TSubject>) {
-    this.conditions.push(condition);
+    super("or", condition);
   }
 
   addOr(condition: ConditionInterface<TSubject>): this {
-    this.conditions.push(condition);
-    return this;
-  }
-
-  getName(): string {
-    const names = this.conditions.map((c) => c.getName());
-    return `(${names.join(" or ")})`;
+    return this.addCondition(condition);
   }
 
   async checkCondition(

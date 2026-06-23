@@ -196,7 +196,7 @@ describe("TransitionLogger (PHP-ported)", () => {
     expect(context).toHaveProperty("fromState");
     expect(context).toHaveProperty("toState");
     expect(context).toHaveProperty("transition");
-    // v3 does NOT include a "subject" field — subject identity is not on the frame
+    // TransitionLogger does NOT forward "subject" to its log context object.
     expect(context).not.toHaveProperty("subject");
     expect(context).not.toHaveProperty("currentState");
     expect(context).not.toHaveProperty("lastState");

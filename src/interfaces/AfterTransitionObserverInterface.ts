@@ -10,7 +10,18 @@ import type { TransitionFrame } from "./TransitionFrameInterface.js";
  * (and any auto-follow-on transitions) completes.
  */
 export interface EnqueueContext {
-  enqueue(event: string, context?: Map<string, unknown>): void;
+  /**
+   * @param ifStateName When provided, the enqueued event is silently
+   * skipped unless the machine is still in that state when the operation
+   * is dequeued — the machine may have moved on in the meantime.
+   * If the machine leaves and returns to that state, the op is not skipped
+   * — only the state name is compared, not entry identity or count.
+   */
+  enqueue(
+    event: string,
+    context?: Map<string, unknown>,
+    ifStateName?: string,
+  ): void;
 }
 
 /**
