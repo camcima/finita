@@ -12,6 +12,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write # tokenless Codecov upload via OIDC
+
     strategy:
       matrix:
         node-version: [20, 22, 24]
@@ -51,13 +55,13 @@ jobs:
         if: matrix.node-version == 22
         uses: codecov/codecov-action@v6
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && matrix.node-version == 22 }}
         uses: codecov/test-results-action@v1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
 
   codeql:
     name: CodeQL
