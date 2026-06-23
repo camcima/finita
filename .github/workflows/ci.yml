@@ -53,13 +53,13 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.node-version == 22
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && matrix.node-version == 22 }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           report_type: test_results
