@@ -285,18 +285,30 @@ export class Statemachine<
     // re-trigger this dispatch.
     if (event) {
       const userEvent = event; // const capture for the closure (event is a mutable let)
-      await this.guardSync(() => userEvent.invoke(this.subject, context));
+      // Dispatch event-attached observers individually so each observer's
+      // synchronous portion runs under the re-entrancy guard. Calling
+      // invoke()/notify() wholesale would guard only the FIRST observer: the
+      // notify loop awaits between observers, and guardSync clears the flag the
+      // moment the first observer's update() yields. Iterate a snapshot so an
+      // observer that detaches during dispatch can't shift the live set.
+      const invokeArgs: readonly unknown[] = [this.subject, context];
+      for (const observer of [...userEvent.getObservers()]) {
+        await this.guardSync(() => observer.update(userEvent, invokeArgs));
+      }
     }
 
     while (true) {
       const transitions = this.currentState.getTransitions();
-      const active = await this.guardSync(() =>
-        ActiveTransitionFilter.filter(
-          transitions,
-          this.subject,
-          context,
-          event ?? undefined,
-        ),
+      // Pass the guard per-transition: filter() awaits each isActive() call in
+      // sequence, so a single guardSync around the whole call would protect
+      // only the first condition. Wrapping each evaluation keeps a re-entrant
+      // condition on a LATER transition detectable instead of deadlocking.
+      const active = await ActiveTransitionFilter.filter(
+        transitions,
+        this.subject,
+        context,
+        event ?? undefined,
+        (fn) => this.guardSync(fn),
       );
       const selected = this.guardSync(() =>
         this.transitionSelector.selectTransition(active),

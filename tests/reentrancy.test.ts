@@ -4,6 +4,8 @@ import {
   Statemachine,
   ReentrancyError,
   CallbackCondition,
+  CallbackObserver,
+  Contradiction,
 } from "../src/index.js";
 import type {
   TransitionFrame,
@@ -35,6 +37,56 @@ describe("re-entrant triggerEvent from an observer", () => {
     await sm.triggerEvent("next");
     expect(sm.getCurrentState().getName()).toBe("c");
   });
+
+  it("flags a SECOND event-attached observer that re-enters the machine", async () => {
+    // The first event observer "uses up" the synchronous guard window (the
+    // notify loop awaits between observers), so a later observer that re-enters
+    // must still be caught — otherwise it enqueues and deadlocks.
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addState("c")
+      .addTransition("a", "b", { event: "go" })
+      .addTransition("b", "c", { event: "next" })
+      .build();
+    const sm = new Statemachine({}, process);
+
+    const event = process.getState("a").getEvent("go");
+    // First observer: benign.
+    event.attach(new CallbackObserver(() => {}));
+    // Second observer: re-enters — must reject, not deadlock.
+    event.attach(
+      new CallbackObserver(async () => {
+        await sm.triggerEvent("next");
+      }),
+    );
+
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(ReentrancyError);
+  }, 2000);
+
+  it("flags a LATER transition's condition that re-enters the machine", async () => {
+    // The first transition's isActive() check clears the synchronous guard
+    // window, so a re-entrant condition on a later transition must still be
+    // caught rather than deadlocking.
+    const reentrantCondition = new CallbackCondition("reentrant", async () => {
+      await sm0.sm!.triggerEvent("go");
+      return true;
+    });
+    const sm0: { sm?: Statemachine } = {};
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addState("c")
+      // First transition evaluated: benign, never active.
+      .addTransition("a", "b", { event: "go", condition: new Contradiction() })
+      // Second transition evaluated: its condition re-enters the machine.
+      .addTransition("a", "c", { event: "go", condition: reentrantCondition })
+      .build();
+    const sm = new Statemachine({}, process);
+    sm0.sm = sm;
+
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(ReentrancyError);
+  }, 2000);
 
   it("throws ReentrancyError when a condition re-enters the machine", async () => {
     const sm0: { sm?: Statemachine } = {};

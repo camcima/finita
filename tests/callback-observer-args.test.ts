@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ProcessBuilder, CallbackObserver } from "../src/index.js";
+import { ProcessBuilder, CallbackObserver, Event } from "../src/index.js";
 
 describe("CallbackObserver argument forwarding", () => {
   const buildEvent = () => {
@@ -43,6 +43,22 @@ describe("CallbackObserver argument forwarding", () => {
       receivedArgs = args;
     });
     await observer.update(event);
+    expect(receivedArgs).toEqual([event]);
+  });
+
+  it("forwards undefined (not []) to observers on a direct notify() with no args", async () => {
+    // invoke() always supplies a (possibly empty) array; a bare notify() means
+    // "no args supplied", which must reach observers as undefined so they can
+    // tell it apart from an explicit zero-arg invoke. CallbackObserver maps the
+    // former to its legacy update(subject) path.
+    const event = new Event("e");
+    let receivedArgs: unknown[] | null = null;
+    event.attach(
+      new CallbackObserver((...args) => {
+        receivedArgs = args;
+      }),
+    );
+    await event.notify();
     expect(receivedArgs).toEqual([event]);
   });
 });

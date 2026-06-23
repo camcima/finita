@@ -269,6 +269,8 @@ When `invoke()` is called:
 
 > **Note:** `event.getInvokeArgs()` is **deprecated** and always returns `[]`. Custom `Observer` implementations should read invoke arguments from the `args` parameter of `update(subject, args)` instead.
 
+> **`invoke()` vs `notify()` with no args:** `invoke()` always supplies a concrete array, so `event.invoke()` delivers `args = []` (an explicit zero-argument call). A bare `event.notify()` supplies no array, so observers receive `args = undefined` — letting them distinguish "invoked with zero args" from "no args supplied" (e.g. `CallbackObserver` routes the latter to its legacy `update(subject)` path).
+
 ### Example
 
 ```typescript

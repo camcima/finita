@@ -34,7 +34,11 @@ export class Event implements EventInterface {
     this.observers.delete(observer);
   }
 
-  async notify(args: readonly unknown[] = []): Promise<void> {
+  async notify(args?: readonly unknown[]): Promise<void> {
+    // Forward args as-is. invoke() always supplies a concrete array (empty when
+    // called with no args), whereas a bare notify() passes undefined — letting
+    // observers distinguish "invoked with zero args" ([]) from "no args
+    // supplied" (undefined), e.g. CallbackObserver's legacy update(subject).
     for (const observer of [...this.observers]) {
       await observer.update(this, args);
     }
