@@ -50,6 +50,7 @@ export class Statemachine<
     error: unknown,
     info: { eventName: string },
   ) => void;
+  private readonly onReleaseError?: (error: unknown) => void;
 
   constructor(
     subject: TSubject,
@@ -84,6 +85,7 @@ export class Statemachine<
     }
     this.maxQueueLength = maxQueue;
     this.onChainedOperationError = options.onChainedOperationError;
+    this.onReleaseError = options.onReleaseError;
   }
 
   // --- public getters ---
@@ -291,6 +293,14 @@ export class Statemachine<
         try {
           await this.mutex.releaseLock();
         } catch (err) {
+          // Surface every release failure through the diagnostic hook — when
+          // the operation also failed, the rejection carries the operation
+          // error and this hook is the only place the release error appears.
+          try {
+            this.onReleaseError?.(err);
+          } catch {
+            /* a throwing hook must not mask engine errors */
+          }
           // A release failure must not mask an operation error, but when the
           // operation succeeded the caller must learn the lock may still be
           // held — otherwise every later operation silently piggybacks on

@@ -335,6 +335,10 @@ sequenceDiagram
     SM->>Mutex: releaseLock()
 ```
 
+## Release Error Behavior
+
+If the automatic release throws while the operation also failed, the caller's rejection carries the operation error; pass `onReleaseError` in `StatemachineOptions` to observe the release failure (e.g. to alert that the lock may still be held).
+
 ## Manual Lock Management
 
 By default, the state machine acquires and releases the lock automatically around each `triggerEvent()` or `checkTransitions()` call. You can disable this for batch operations:

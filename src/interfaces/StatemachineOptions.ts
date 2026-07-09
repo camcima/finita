@@ -49,4 +49,12 @@ export interface StatemachineOptions<TSubject = unknown> {
    * when set. Defaults to Infinity (unbounded, the previous behavior).
    */
   maxQueueLength?: number;
+  /**
+   * Diagnostic hook called whenever the automatic post-operation lock
+   * release throws — including when the operation itself also failed, in
+   * which case the caller's rejection carries the operation error and the
+   * release error would otherwise be discarded. Does not change rejection
+   * behavior. Exceptions thrown by the hook itself are swallowed.
+   */
+  onReleaseError?: (error: unknown) => void;
 }
