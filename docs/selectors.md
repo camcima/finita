@@ -159,7 +159,7 @@ transitions. Score selectors compare like with like.
 
 **Import:** `import { WeightTransition } from '@camcima/finita'`
 
-Selects the transition with the highest weight. Transitions have a default weight of `1`, which can be changed with `setWeight()`.
+Selects the transition with the highest weight. Transitions have a default weight of `1`, set at construction time via `ProcessBuilder.addTransition({ weight })`.
 
 ### What It Does
 

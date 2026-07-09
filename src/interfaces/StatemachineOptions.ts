@@ -6,7 +6,16 @@ export interface StatemachineOptions<TSubject = unknown> {
   initialStateName?: string;
   /** Defaults to OneOrNoneActiveTransition. */
   transitionSelector?: TransitionSelectorInterface<TSubject>;
-  /** Defaults to NullMutex (no cross-process serialization). */
+  /**
+   * Defaults to NullMutex (no cross-process serialization).
+   *
+   * Must be exclusive to this machine — never share one MutexInterface
+   * instance between machines: the engine reads isAcquired() as "this
+   * machine holds the lock", so a shared instance silently disables mutual
+   * exclusion. To coordinate machines, share the underlying
+   * LockAdapterInterface (same resource name) and construct one mutex per
+   * machine, as MutexFactory does.
+   */
   mutex?: MutexInterface;
   /** When true, the engine releases the mutex at the end of each top-level operation. Defaults to true. */
   autoreleaseLock?: boolean;

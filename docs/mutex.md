@@ -195,25 +195,58 @@ Implement this interface to plug in your own locking mechanism. Methods can retu
 
 ---
 
+## One machine per mutex instance
+
+A `MutexInterface` instance carries per-machine state: the engine treats
+`isAcquired() === true` as "this machine already holds the lock" and skips
+acquisition (this is what makes manual lock management with
+`autoreleaseLock: false` possible). If you pass the same mutex instance to
+two machines, the second machine silently piggybacks on the first machine's
+lock and mutual exclusion is lost.
+
+Always construct one mutex per machine — `MutexFactory` does this correctly.
+Cross-machine exclusion comes from sharing the underlying
+`LockAdapterInterface` (same resource name), never from sharing a mutex
+object.
+
+---
+
 ## Custom Lock Adapters
 
 ### Redis Lock Adapter
 
-An async adapter that returns `Promise<boolean>`, which satisfies `MaybePromise<boolean>`:
+An async adapter that returns `Promise<boolean>`, which satisfies `MaybePromise<boolean>`. It stores a per-adapter ownership token and releases only a lock it still owns (atomic compare-and-delete via a Lua script):
 
 ```typescript
+import { randomUUID } from "node:crypto";
 import type { LockAdapterInterface } from "@camcima/finita";
 
+const RELEASE_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("del", KEYS[1])
+else
+  return 0
+end
+`;
+
 class RedisLockAdapter implements LockAdapterInterface {
+  private readonly token = randomUUID();
+
   constructor(private client: RedisClient) {}
 
   async acquireLock(name: string): Promise<boolean> {
-    const result = await this.client.set(`lock:${name}`, "1", "NX", "EX", 30);
+    const result = await this.client.set(`lock:${name}`, this.token, "NX");
     return result !== null;
   }
 
   async releaseLock(name: string): Promise<boolean> {
-    return (await this.client.del(`lock:${name}`)) > 0;
+    const deleted = await this.client.eval(
+      RELEASE_SCRIPT,
+      1,
+      `lock:${name}`,
+      this.token,
+    );
+    return deleted === 1;
   }
 
   async isLocked(name: string): Promise<boolean> {
@@ -221,6 +254,17 @@ class RedisLockAdapter implements LockAdapterInterface {
   }
 }
 ```
+
+> **Warning — leases and TTLs:** `LockAdapterInterface` has no ownership
+> token, renewal, or fencing support, so a TTL-based (leased) lock cannot be
+> implemented safely through it: if an operation outlives the TTL, another
+> worker acquires the lock, and an unconditional `DEL` would delete _that
+> worker's_ lock, breaking mutual exclusion. The adapter above therefore
+> keeps a per-adapter token, releases only its own lock, and does **not**
+> set a TTL. The trade-off: if a process crashes while holding the lock, the
+> lock must be cleared by operational tooling. True leases (TTL + renewal +
+> fencing tokens) require a token-aware locking API and are planned for the
+> next major version.
 
 ### Database Lock Adapter
 
