@@ -44,6 +44,33 @@ describe("maxQueueLength", () => {
     expect(sm.getCurrentState().getName()).toBe("b");
   });
 
+  it("rejects checkTransitions beyond the limit and names it in the error", async () => {
+    const gate = deferred();
+    const slow: ConditionInterface = {
+      getName: () => "slow",
+      checkCondition: async () => {
+        await gate.promise;
+        return true;
+      },
+    };
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go", condition: slow })
+      .build();
+    const sm = new Statemachine({}, process, { maxQueueLength: 1 });
+
+    const first = sm.triggerEvent("go"); // dequeued immediately; blocked on the gate
+    const second = sm.triggerEvent("go"); // waits in the queue (size 1 == limit)
+    const rejection = await sm.checkTransitions().catch((err: unknown) => err);
+    expect(rejection).toBeInstanceOf(QueueLimitExceededError);
+    expect((rejection as Error).message).toContain("checkTransitions()");
+
+    gate.resolve();
+    await first;
+    await second.catch(() => undefined);
+  });
+
   it("rejects invalid maxQueueLength values at construction", () => {
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })
