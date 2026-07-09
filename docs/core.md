@@ -313,7 +313,9 @@ A process defines a complete workflow as a named, frozen collection of states. I
 
 ### Immutability
 
-A `Process` is **immutable after construction**. All states and transitions are frozen by the builder.
+A `Process` is **immutable after construction**. `Process`, every `State`, and every `Transition` are frozen (`Object.freeze`) by the builder.
+
+Freezing is shallow by design: metadata **values** and condition objects are live references, and each state's `Event` objects keep runtime-mutable observer lists (that is how `event.attach()` works). The frozen layer is the graph topology — states, transitions, names, and weights.
 
 ### Example
 
