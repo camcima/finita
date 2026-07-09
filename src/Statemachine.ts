@@ -88,6 +88,7 @@ export class Statemachine<
   // --- public observer attach/detach ---
 
   attachBefore(observer: BeforeTransitionObserver<TSubject>): void {
+    if (this.beforeObservers.includes(observer)) return;
     this.beforeObservers.push(observer);
   }
 
@@ -101,6 +102,7 @@ export class Statemachine<
   }
 
   attachAfter(observer: AfterTransitionObserver<TSubject>): void {
+    if (this.afterObservers.includes(observer)) return;
     this.afterObservers.push(observer);
   }
 
