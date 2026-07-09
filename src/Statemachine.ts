@@ -21,6 +21,7 @@ import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
+import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
 
 export class Statemachine<
   TSubject = unknown,
@@ -35,6 +36,7 @@ export class Statemachine<
 
   private autoreleaseLock: boolean;
   private readonly maxAutomaticHops: number;
+  private readonly maxQueueLength: number;
 
   private readonly queue = new OperationQueue();
   private running = false;
@@ -71,6 +73,16 @@ export class Statemachine<
       );
     }
     this.maxAutomaticHops = hops;
+    const maxQueue = options.maxQueueLength ?? Infinity;
+    if (
+      maxQueue !== Infinity &&
+      (!Number.isInteger(maxQueue) || maxQueue < 1)
+    ) {
+      throw new RangeError(
+        `maxQueueLength must be a positive integer; got ${String(options.maxQueueLength)}`,
+      );
+    }
+    this.maxQueueLength = maxQueue;
     this.onChainedOperationError = options.onChainedOperationError;
   }
 
@@ -205,6 +217,9 @@ export class Statemachine<
     reject: (err: unknown) => void,
     ifStateName?: string,
   ): void {
+    if (this.queue.size() >= this.maxQueueLength) {
+      throw new QueueLimitExceededError(this.maxQueueLength, eventName);
+    }
     this.queue.enqueue({
       eventName,
       context: context ?? new Map(),

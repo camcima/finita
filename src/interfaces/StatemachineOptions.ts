@@ -40,4 +40,13 @@ export interface StatemachineOptions<TSubject = unknown> {
     error: unknown,
     info: { eventName: string },
   ) => void;
+  /**
+   * Maximum number of operations that may wait in the queue (the running
+   * operation does not count). When the limit is reached, further
+   * triggerEvent/checkTransitions calls reject with
+   * QueueLimitExceededError, and EnqueueContext.enqueue() throws it into
+   * the enqueuing after-observer's error path. Must be a positive integer
+   * when set. Defaults to Infinity (unbounded, the previous behavior).
+   */
+  maxQueueLength?: number;
 }

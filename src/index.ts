@@ -123,6 +123,7 @@ export {
   AmbiguousTransitionError,
   AutomaticTransitionCycleError,
   ReentrancyError,
+  QueueLimitExceededError,
 } from "./error/index.js";
 export type {
   GraphValidationCode,

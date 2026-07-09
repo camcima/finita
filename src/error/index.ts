@@ -12,5 +12,6 @@ export { InvalidSubjectError } from "./InvalidSubjectError.js";
 export { AmbiguousTransitionError } from "./AmbiguousTransitionError.js";
 export { AutomaticTransitionCycleError } from "./AutomaticTransitionCycleError.js";
 export { ReentrancyError } from "./ReentrancyError.js";
+export { QueueLimitExceededError } from "./QueueLimitExceededError.js";
 export type { GraphValidationCode } from "./GraphValidationError.js";
 export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";

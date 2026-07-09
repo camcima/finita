@@ -29,4 +29,8 @@ export class OperationQueue {
   isEmpty(): boolean {
     return this.items.length === 0;
   }
+
+  size(): number {
+    return this.items.length;
+  }
 }
