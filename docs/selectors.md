@@ -163,7 +163,7 @@ Selects the transition with the highest weight. Transitions have a default weigh
 
 ### What It Does
 
-Finds the transition(s) with the highest weight. Uses an epsilon tolerance (default: `0.001`) for floating-point comparison. If there's a tie, delegates to the inner selector.
+Finds the transition(s) with the highest weight. Uses an epsilon tolerance (default: `0.001`) for floating-point comparison. If there's a tie, delegates to the inner selector. Transition weights must be finite numbers — the builder rejects NaN and ±Infinity at addTransition time, and the selector throws RangeError if a custom TransitionInterface returns a non-finite weight.
 
 ### Constructor
 
@@ -171,10 +171,10 @@ Finds the transition(s) with the highest weight. Uses an epsilon tolerance (defa
 new WeightTransition(innerSelector?: TransitionSelectorInterface, epsilon?: number)
 ```
 
-| Parameter       | Type                          | Default                           | Description                                    |
-| --------------- | ----------------------------- | --------------------------------- | ---------------------------------------------- |
-| `innerSelector` | `TransitionSelectorInterface` | `new OneOrNoneActiveTransition()` | Fallback for ties                              |
-| `epsilon`       | `number`                      | `0.001`                           | Tolerance for floating-point weight comparison |
+| Parameter       | Type                          | Default                           | Description                                                                                                                |
+| --------------- | ----------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `innerSelector` | `TransitionSelectorInterface` | `new OneOrNoneActiveTransition()` | Fallback for ties                                                                                                          |
+| `epsilon`       | `number`                      | `0.001`                           | Tolerance for floating-point weight comparison. Must be a finite number greater than 0; invalid values throw `RangeError`. |
 
 ### When to Use
 

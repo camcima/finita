@@ -12,6 +12,11 @@ export class WeightTransition<
     innerSelector?: TransitionSelectorInterface<TSubject>,
     epsilon = 0.001,
   ) {
+    if (!Number.isFinite(epsilon) || epsilon <= 0) {
+      throw new RangeError(
+        `WeightTransition epsilon must be a finite number greater than 0; got ${String(epsilon)}`,
+      );
+    }
     this.innerSelector =
       innerSelector ?? new OneOrNoneActiveTransition<TSubject>();
     this.epsilon = epsilon;
@@ -24,6 +29,11 @@ export class WeightTransition<
     let maxWeight = Number.NEGATIVE_INFINITY;
     for (const transition of all) {
       const weight = transition.getWeight();
+      if (!Number.isFinite(weight)) {
+        throw new RangeError(
+          `WeightTransition: transition weights must be finite numbers; got ${String(weight)}`,
+        );
+      }
       if (weight > maxWeight) maxWeight = weight;
     }
     const best = all.filter(

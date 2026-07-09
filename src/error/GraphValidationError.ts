@@ -8,6 +8,7 @@ export type GraphValidationCode =
   | "invalidStateName"
   | "invalidEventName"
   | "invalidConditionName"
+  | "invalidTransitionWeight"
   | "orphanState";
 
 export class GraphValidationError extends FinitaError {
