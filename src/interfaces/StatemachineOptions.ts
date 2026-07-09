@@ -29,4 +29,15 @@ export interface StatemachineOptions<TSubject = unknown> {
    * Defaults to 100.
    */
   maxAutomaticHops?: number;
+  /**
+   * Called when an operation chained via EnqueueContext.enqueue() fails.
+   * Chained operations are not awaited by the caller whose transition
+   * enqueued them, so without this hook their errors are discarded.
+   * Exceptions thrown by the hook itself are swallowed — it must not be
+   * able to break the machine's drain loop.
+   */
+  onChainedOperationError?: (
+    error: unknown,
+    info: { eventName: string },
+  ) => void;
 }

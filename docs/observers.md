@@ -80,6 +80,32 @@ ctx.enqueue("nextEvent", new Map([["key", "value"]]));
 
 `enqueue()` never runs inline — the event is appended to the FIFO queue and runs as its own top-level operation after the current operation (and all queued auto-follow-on transitions) completes.
 
+### Completion boundary
+
+`await sm.triggerEvent(...)` (and `checkTransitions`) resolves when **that
+operation** has fully committed: its transition, any automatic follow-on
+transitions, and the mutex release. It does **not** wait for operations
+chained with `ctx.enqueue()` — those run later as their own top-level
+operations, and their failures never reject the original caller's promise.
+
+- To wait for all queued work — including chained operations — use
+  `await sm.whenIdle()`.
+- To observe failures in chained operations, pass `onChainedOperationError`
+  in `StatemachineOptions`. Without it, chained failures are silently
+  discarded.
+
+> **Warning — re-entrancy after `await`:** the `ReentrancyError` guard only
+> catches `triggerEvent`/`checkTransitions` calls made **before an observer's
+> or condition's first `await`**. A call made _after_ an `await` inside the
+> same callback is not detected and will deadlock the machine permanently:
+> the new operation waits in the queue behind the running operation, which is
+> itself waiting for your callback to return. Never await a trigger from
+> inside a callback — use `ctx.enqueue()` (after-observers) or defer the call
+> off the operation entirely, e.g. `setTimeout(() => sm.triggerEvent(...))`,
+> and observe completion with `whenIdle()`.
+
+The same caution applies to `whenIdle()`: awaiting it from inside an observer deadlocks, because the drain it waits for cannot finish until that observer returns.
+
 ## Observer Lifecycle
 
 ```mermaid
@@ -313,8 +339,8 @@ process
 const sm = new Statemachine({}, process);
 sm.attachAfter(new OnEnterObserver());
 
-await sm.triggerEvent("approve");
-// After the full queue drains:
+await sm.triggerEvent("approve"); // resolves when the approve transition commits
+await sm.whenIdle(); // resolves after the chained entry event has run
 // Output: Entered approved state! Sending notification...
 ```
 

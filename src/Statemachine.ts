@@ -44,6 +44,11 @@ export class Statemachine<
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
 
+  private readonly onChainedOperationError?: (
+    error: unknown,
+    info: { eventName: string },
+  ) => void;
+
   constructor(
     subject: TSubject,
     process: ProcessInterface,
@@ -66,6 +71,7 @@ export class Statemachine<
       );
     }
     this.maxAutomaticHops = hops;
+    this.onChainedOperationError = options.onChainedOperationError;
   }
 
   // --- public getters ---
@@ -389,8 +395,17 @@ export class Statemachine<
               () => {
                 /* chained ops are not awaited by the original caller */
               },
-              () => {
-                /* chained errors do not propagate to the original caller */
+              (err) => {
+                // Chained errors do not propagate to the original caller;
+                // surface them through the optional sink instead. The sink
+                // must never throw into the drain loop.
+                try {
+                  this.onChainedOperationError?.(err, {
+                    eventName: chainedEventName,
+                  });
+                } catch {
+                  /* swallow hook failures */
+                }
               },
               ifStateName,
             );
