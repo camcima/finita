@@ -104,6 +104,7 @@ export type {
   GraphEdge,
   DotOptions,
   MermaidOptions,
+  GraphDirection,
 } from "./graph/index.js";
 
 // Errors

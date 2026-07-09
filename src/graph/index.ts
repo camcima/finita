@@ -5,4 +5,5 @@ export type {
   GraphEdge,
   DotOptions,
   MermaidOptions,
+  GraphDirection,
 } from "./GraphBuilder.js";

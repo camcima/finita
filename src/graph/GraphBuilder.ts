@@ -39,12 +39,24 @@ function escapeMermaidLabel(str: string): string {
   return str.replace(/\\/g, "#92;").replace(/"/g, "#quot;");
 }
 
+export type GraphDirection = "TB" | "BT" | "LR" | "RL";
+
+const VALID_DIRECTIONS: ReadonlySet<string> = new Set(["TB", "BT", "LR", "RL"]);
+
+function assertDirection(value: string, optionName: string): void {
+  if (!VALID_DIRECTIONS.has(value)) {
+    throw new RangeError(
+      `${optionName} must be one of "TB", "BT", "LR", "RL"; got ${JSON.stringify(value)}`,
+    );
+  }
+}
+
 export interface DotOptions {
-  rankdir?: string;
+  rankdir?: GraphDirection;
 }
 
 export interface MermaidOptions {
-  direction?: string;
+  direction?: GraphDirection;
 }
 
 export class GraphBuilder {
@@ -132,6 +144,7 @@ export class GraphBuilder {
   toDot(options?: DotOptions): string {
     const graph = this.getGraph();
     const rankdir = options?.rankdir ?? "LR";
+    assertDirection(rankdir, "rankdir");
     const lines: string[] = [];
     lines.push("digraph {");
     lines.push(`  rankdir=${rankdir};`);
@@ -152,6 +165,7 @@ export class GraphBuilder {
   toMermaid(options?: MermaidOptions): string {
     const graph = this.getGraph();
     const direction = options?.direction ?? "LR";
+    assertDirection(direction, "direction");
     const lines: string[] = [];
     lines.push(`stateDiagram-v2`);
     lines.push(`  direction ${direction}`);
