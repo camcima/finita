@@ -45,8 +45,11 @@ export interface StatemachineOptions<TSubject = unknown> {
    * operation does not count). When the limit is reached, further
    * triggerEvent/checkTransitions calls reject with
    * QueueLimitExceededError, and EnqueueContext.enqueue() throws it into
-   * the enqueuing after-observer's error path. Must be a positive integer
-   * when set. Defaults to Infinity (unbounded, the previous behavior).
+   * the enqueuing after-observer's error path. In that case the original
+   * caller's promise rejects even though its transition already
+   * committed — check the machine's state, not just the rejection, before
+   * retrying. Must be a positive integer when set. Defaults to Infinity
+   * (unbounded, the previous behavior).
    */
   maxQueueLength?: number;
   /**

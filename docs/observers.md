@@ -9,8 +9,6 @@ Observers react to events or state changes. There are two contexts where observe
 
 v3 replaces the single `Observer.update(subject)` interface with two focused interfaces:
 
-Attaching the same observer instance more than once is a no-op — the observer is notified once per transition, matching `event.attach()` and factory semantics.
-
 ### `BeforeTransitionObserver`
 
 Runs _before_ the state changes. Receives a `ProposedTransitionFrame` — the current state is still `fromState` at call time. **Throwing aborts the transition** — the state is not mutated and the caller's promise rejects with the thrown error.
@@ -107,6 +105,8 @@ operations, and their failures never reject the original caller's promise.
 The same caution applies to `whenIdle()`: awaiting it from inside an observer deadlocks, because the drain it waits for cannot finish until that observer returns.
 
 ## Observer Lifecycle
+
+Attaching the same observer instance more than once is a no-op — the observer is notified once per transition, matching `event.attach()` and factory semantics.
 
 ```mermaid
 sequenceDiagram
