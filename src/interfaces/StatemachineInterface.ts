@@ -12,6 +12,13 @@ export interface StatemachineInterface<TSubject = unknown> {
   triggerEvent(name: string, context?: Map<string, unknown>): Promise<void>;
   checkTransitions(context?: Map<string, unknown>): Promise<void>;
 
+  /**
+   * Resolves once the operation queue is empty and the runner is idle,
+   * including operations chained via EnqueueContext.enqueue(). Resolves
+   * immediately if the machine is already idle.
+   */
+  whenIdle(): Promise<void>;
+
   attachBefore(observer: BeforeTransitionObserver<TSubject>): void;
   detachBefore(observer: BeforeTransitionObserver<TSubject>): void;
   getBeforeObservers(): Iterable<BeforeTransitionObserver<TSubject>>;

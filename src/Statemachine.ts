@@ -38,6 +38,7 @@ export class Statemachine<
 
   private readonly queue = new OperationQueue();
   private running = false;
+  private idleWaiters: Array<() => void> = [];
   private inSyncCallback = false;
 
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
@@ -153,6 +154,22 @@ export class Statemachine<
     });
   }
 
+  /**
+   * Resolves once the operation queue is empty and the runner is idle —
+   * i.e. every operation enqueued so far, including operations chained via
+   * EnqueueContext.enqueue(), has completed. Resolves immediately if the
+   * machine is already idle. Note this is a quiescence point, not a
+   * receipt: work scheduled later (e.g. from a timer) starts a new drain.
+   */
+  whenIdle(): Promise<void> {
+    if (!this.running && this.queue.isEmpty()) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.idleWaiters.push(resolve);
+    });
+  }
+
   /** Runs fn with the re-entrancy flag set for its SYNCHRONOUS portion only:
    *  the flag is cleared as soon as fn returns (before any promise it returned
    *  is awaited), so concurrent external callers are never affected. This
@@ -204,6 +221,13 @@ export class Statemachine<
       }
     } finally {
       this.running = false;
+      // The drain loop only exits when the queue is empty, but guard anyway:
+      // waiters must never be released while work is pending.
+      if (this.queue.isEmpty() && this.idleWaiters.length > 0) {
+        const waiters = this.idleWaiters;
+        this.idleWaiters = [];
+        for (const waiter of waiters) waiter();
+      }
     }
   }
 
