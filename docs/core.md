@@ -31,11 +31,11 @@ new ProcessBuilder<TSubject = unknown>(processName: string)
 
 ### Methods
 
-| Method                              | Return Type | Description                                                    |
-| ----------------------------------- | ----------- | -------------------------------------------------------------- |
-| `addState(name, options?)`          | `this`      | Declares a state. Pass `{ initial: true }` for the start state |
-| `addTransition(from, to, options?)` | `this`      | Declares a directed edge between two declared states           |
-| `build(options?)`                   | `Process`   | Validates and freezes the graph. May only be called once.      |
+| Method                              | Return Type | Description                                                                                                                                                             |
+| ----------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `addState(name, options?)`          | `this`      | Declares a state. Pass `{ initial: true }` for the start state                                                                                                          |
+| `addTransition(from, to, options?)` | `this`      | Declares a directed edge between two declared states                                                                                                                    |
+| `build(options?)`                   | `Process`   | Validates and freezes the graph. May only be called once **successfully** — a failed build leaves the builder open so the error can be corrected and `build()` retried. |
 
 ### `addState` options
 

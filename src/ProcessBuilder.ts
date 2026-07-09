@@ -120,7 +120,6 @@ export class ProcessBuilder<TSubject = unknown> {
     if (this.built) {
       throw new ProcessFinalizedError(this.processName);
     }
-    this.built = true;
 
     this.validateInitialState();
     this.validateTransitionEndpoints();
@@ -139,6 +138,7 @@ export class ProcessBuilder<TSubject = unknown> {
     }
 
     const initialState = finalStates.get(initialName)!;
+    this.built = true;
     return new Process(
       INTERNAL_CONSTRUCTION_KEY,
       this.processName,
