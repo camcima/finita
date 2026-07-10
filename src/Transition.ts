@@ -29,6 +29,7 @@ export class Transition<
     this.eventName = eventName;
     this.condition = condition;
     this.weight = weight;
+    Object.freeze(this);
   }
 
   getTargetState(): StateInterface {

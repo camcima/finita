@@ -104,6 +104,7 @@ export type {
   GraphEdge,
   DotOptions,
   MermaidOptions,
+  GraphDirection,
 } from "./graph/index.js";
 
 // Errors
@@ -122,6 +123,7 @@ export {
   AmbiguousTransitionError,
   AutomaticTransitionCycleError,
   ReentrancyError,
+  QueueLimitExceededError,
 } from "./error/index.js";
 export type {
   GraphValidationCode,

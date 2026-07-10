@@ -47,6 +47,7 @@ export class State implements StateInterface {
       throw new Error(`State "${this.name}" transitions already set`);
     }
     this._transitions = new Set(transitions);
+    Object.freeze(this);
   }
 
   getName(): string {

@@ -21,6 +21,7 @@ import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
+import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
 
 export class Statemachine<
   TSubject = unknown,
@@ -35,13 +36,21 @@ export class Statemachine<
 
   private autoreleaseLock: boolean;
   private readonly maxAutomaticHops: number;
+  private readonly maxQueueLength: number;
 
   private readonly queue = new OperationQueue();
   private running = false;
+  private idleWaiters: Array<() => void> = [];
   private inSyncCallback = false;
 
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
+
+  private readonly onChainedOperationError?: (
+    error: unknown,
+    info: { eventName: string },
+  ) => void;
+  private readonly onReleaseError?: (error: unknown) => void;
 
   constructor(
     subject: TSubject,
@@ -65,6 +74,18 @@ export class Statemachine<
       );
     }
     this.maxAutomaticHops = hops;
+    const maxQueue = options.maxQueueLength ?? Infinity;
+    if (
+      maxQueue !== Infinity &&
+      (!Number.isInteger(maxQueue) || maxQueue < 1)
+    ) {
+      throw new RangeError(
+        `maxQueueLength must be a positive integer; got ${String(options.maxQueueLength)}`,
+      );
+    }
+    this.maxQueueLength = maxQueue;
+    this.onChainedOperationError = options.onChainedOperationError;
+    this.onReleaseError = options.onReleaseError;
   }
 
   // --- public getters ---
@@ -88,6 +109,7 @@ export class Statemachine<
   // --- public observer attach/detach ---
 
   attachBefore(observer: BeforeTransitionObserver<TSubject>): void {
+    if (this.beforeObservers.includes(observer)) return;
     this.beforeObservers.push(observer);
   }
 
@@ -101,6 +123,7 @@ export class Statemachine<
   }
 
   attachAfter(observer: AfterTransitionObserver<TSubject>): void {
+    if (this.afterObservers.includes(observer)) return;
     this.afterObservers.push(observer);
   }
 
@@ -151,6 +174,22 @@ export class Statemachine<
     });
   }
 
+  /**
+   * Resolves once the operation queue is empty and the runner is idle —
+   * i.e. every operation enqueued so far, including operations chained via
+   * EnqueueContext.enqueue(), has completed. Resolves immediately if the
+   * machine is already idle. Note this is a quiescence point, not a
+   * receipt: work scheduled later (e.g. from a timer) starts a new drain.
+   */
+  whenIdle(): Promise<void> {
+    if (!this.running && this.queue.isEmpty()) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.idleWaiters.push(resolve);
+    });
+  }
+
   /** Runs fn with the re-entrancy flag set for its SYNCHRONOUS portion only:
    *  the flag is cleared as soon as fn returns (before any promise it returned
    *  is awaited), so concurrent external callers are never affected. This
@@ -180,6 +219,9 @@ export class Statemachine<
     reject: (err: unknown) => void,
     ifStateName?: string,
   ): void {
+    if (this.queue.size() >= this.maxQueueLength) {
+      throw new QueueLimitExceededError(this.maxQueueLength, eventName);
+    }
     this.queue.enqueue({
       eventName,
       context: context ?? new Map(),
@@ -202,6 +244,13 @@ export class Statemachine<
       }
     } finally {
       this.running = false;
+      // The drain loop only exits when the queue is empty, but guard anyway:
+      // waiters must never be released while work is pending.
+      if (this.queue.isEmpty() && this.idleWaiters.length > 0) {
+        const waiters = this.idleWaiters;
+        this.idleWaiters = [];
+        for (const waiter of waiters) waiter();
+      }
     }
   }
 
@@ -244,6 +293,14 @@ export class Statemachine<
         try {
           await this.mutex.releaseLock();
         } catch (err) {
+          // Surface every release failure through the diagnostic hook — when
+          // the operation also failed, the rejection carries the operation
+          // error and this hook is the only place the release error appears.
+          try {
+            this.onReleaseError?.(err);
+          } catch {
+            /* a throwing hook must not mask engine errors */
+          }
           // A release failure must not mask an operation error, but when the
           // operation succeeded the caller must learn the lock may still be
           // held — otherwise every later operation silently piggybacks on
@@ -363,8 +420,17 @@ export class Statemachine<
               () => {
                 /* chained ops are not awaited by the original caller */
               },
-              () => {
-                /* chained errors do not propagate to the original caller */
+              (err) => {
+                // Chained errors do not propagate to the original caller;
+                // surface them through the optional sink instead. The sink
+                // must never throw into the drain loop.
+                try {
+                  this.onChainedOperationError?.(err, {
+                    eventName: chainedEventName,
+                  });
+                } catch {
+                  /* swallow hook failures */
+                }
               },
               ifStateName,
             );

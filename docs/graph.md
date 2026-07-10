@@ -160,9 +160,9 @@ const dot = builder.toDot();
 
 ### DotOptions
 
-| Option    | Type     | Default | Description                                                           |
-| --------- | -------- | ------- | --------------------------------------------------------------------- |
-| `rankdir` | `string` | `'LR'`  | Graph direction: `'LR'` (left-to-right), `'TB'` (top-to-bottom), etc. |
+| Option    | Type                           | Default | Description                                                                                              |
+| --------- | ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
+| `rankdir` | `"TB" \| "BT" \| "LR" \| "RL"` | `'LR'`  | Graph direction: `'LR'` (left-to-right), `'TB'` (top-to-bottom), etc. Invalid values throw `RangeError`. |
 
 ```typescript
 // Top-to-bottom layout
@@ -200,9 +200,9 @@ const mermaid = builder.toMermaid();
 
 ### MermaidOptions
 
-| Option      | Type     | Default | Description                                       |
-| ----------- | -------- | ------- | ------------------------------------------------- |
-| `direction` | `string` | `'LR'`  | Diagram direction: `'LR'`, `'TB'`, `'RL'`, `'BT'` |
+| Option      | Type                           | Default | Description                                                                           |
+| ----------- | ------------------------------ | ------- | ------------------------------------------------------------------------------------- |
+| `direction` | `"TB" \| "BT" \| "LR" \| "RL"` | `'LR'`  | Diagram direction: `'LR'`, `'TB'`, `'RL'`, `'BT'`. Invalid values throw `RangeError`. |
 
 ```typescript
 // Top-to-bottom layout

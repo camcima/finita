@@ -98,12 +98,20 @@ export class ProcessBuilder<TSubject = unknown> {
         { fromState, toState, conditionName },
       );
     }
+    const weight = options.weight ?? 1;
+    if (!Number.isFinite(weight)) {
+      throw new GraphValidationError(
+        "invalidTransitionWeight",
+        `addTransition from "${fromState}" to "${toState}": weight must be a finite number; got ${String(weight)}`,
+        { fromState, toState, eventName, weight },
+      );
+    }
     this.transitionSpecs.push({
       fromState,
       toState,
       eventName,
       condition: options.condition ?? null,
-      weight: options.weight ?? 1,
+      weight,
     });
     return this;
   }
@@ -112,7 +120,6 @@ export class ProcessBuilder<TSubject = unknown> {
     if (this.built) {
       throw new ProcessFinalizedError(this.processName);
     }
-    this.built = true;
 
     this.validateInitialState();
     this.validateTransitionEndpoints();
@@ -131,6 +138,7 @@ export class ProcessBuilder<TSubject = unknown> {
     }
 
     const initialState = finalStates.get(initialName)!;
+    this.built = true;
     return new Process(
       INTERNAL_CONSTRUCTION_KEY,
       this.processName,
