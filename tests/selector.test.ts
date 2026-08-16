@@ -16,8 +16,7 @@ function buildTransitions(
     to: string;
     event?: string;
     condition?:
-      | InstanceType<typeof CallbackCondition>
-      | InstanceType<typeof Tautology>;
+      InstanceType<typeof CallbackCondition> | InstanceType<typeof Tautology>;
     weight?: number;
   }>,
 ): TransitionInterface[] {
