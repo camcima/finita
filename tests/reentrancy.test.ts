@@ -132,6 +132,43 @@ describe("re-entrant triggerEvent from an observer", () => {
     expect(sm.getCurrentState().getName()).toBe("b");
   });
 
+  it("throws ReentrancyError when an observer awaits whenIdle()", async () => {
+    // whenIdle() from inside a callback can never resolve: the machine cannot
+    // reach idle while the runner is blocked on that very callback.
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process);
+
+    const observer = {
+      async notify(_frame: TransitionFrame): Promise<void> {
+        await sm.whenIdle(); // forbidden — would deadlock
+      },
+    };
+    sm.attachAfter(observer);
+
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(ReentrancyError);
+
+    // The machine is NOT deadlocked: it still drains once the observer is gone.
+    sm.detachAfter(observer);
+    await sm.whenIdle();
+    expect(sm.getCurrentState().getName()).toBe("b");
+  }, 2000);
+
+  it("still resolves whenIdle() for external callers", async () => {
+    const process = new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+    const sm = new Statemachine({}, process);
+    void sm.triggerEvent("go");
+    await sm.whenIdle(); // outside any callback — must resolve normally
+    expect(sm.getCurrentState().getName()).toBe("b");
+  }, 2000);
+
   it("does not flag a benign observer that awaits non-reentrant work", async () => {
     const process = new ProcessBuilder("p")
       .addState("a", { initial: true })

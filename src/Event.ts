@@ -44,8 +44,10 @@ export class Event implements EventInterface {
     }
   }
 
+  /** Snapshot — detaching later does not change an already-returned list,
+   *  and mutating it does not change the event's registrations. */
   getObservers(): Iterable<Observer> {
-    return this.observers;
+    return [...this.observers];
   }
 
   getMetadata(): Record<string, unknown> {

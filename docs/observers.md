@@ -486,6 +486,8 @@ class SendEmailCommand implements Observer {
 process.getState("shipped").getEvent("ship").attach(new SendEmailCommand());
 ```
 
+> **Event observers are shared by every machine built from the process.** `Event` objects live on the `Process` graph, and neither `Statemachine` nor `Factory` clones it. Attaching a command "for one order" attaches it to every machine that uses that process, so attach event commands once at setup and read the per-transition subject from `args[0]` (as above) rather than closing over one subject. For behavior that belongs to a single machine, use `attachAfter`/`attachBefore` on that machine instead.
+
 ### State Machine Observer (After)
 
 React to any state change using the frame parameter:

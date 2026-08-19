@@ -143,6 +143,46 @@ describe("typed throws", () => {
       // selector.test.ts asserts the message contains "More than one"
       expect(e.message).toContain("More than one");
     });
+
+    it("carries the candidate transitions that caused the ambiguity", async () => {
+      const { OneOrNoneActiveTransition } =
+        await import("../src/selector/OneOrNoneActiveTransition.js");
+      const { CallbackCondition } =
+        await import("../src/condition/CallbackCondition.js");
+      const process = new ProcessBuilder("p")
+        .addState("a", { initial: true })
+        .addState("b")
+        .addState("c")
+        .addTransition("a", "b", { event: "go" })
+        .addTransition("a", "c", {
+          event: "go",
+          condition: new CallbackCondition("isVip", () => true),
+          weight: 7,
+        })
+        .build();
+      const transitions = Array.from(process.getState("a").getTransitions());
+      let caught: unknown;
+      try {
+        new OneOrNoneActiveTransition().selectTransition(transitions);
+      } catch (err) {
+        caught = err;
+      }
+      const e = caught as AmbiguousTransitionError;
+      // Debugging an ambiguity needs the candidates, not just how many.
+      expect(e.candidates.map((c) => c.targetStateName).sort()).toEqual([
+        "b",
+        "c",
+      ]);
+      expect(e.candidates).toContainEqual({
+        targetStateName: "c",
+        eventName: "go",
+        conditionName: "isVip",
+        weight: 7,
+      });
+      expect(e.message).toContain('"b"');
+      expect(e.message).toContain('"c"');
+      expect(e.message).toContain("isVip");
+    });
   });
 
   describe("Statemachine automatic-cycle detection", () => {

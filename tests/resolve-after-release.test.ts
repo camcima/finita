@@ -3,6 +3,7 @@ import {
   ProcessBuilder,
   Statemachine,
   WrongEventForStateError,
+  LockCanNotBeReleasedError,
 } from "../src/index.js";
 import type { MutexInterface } from "../src/index.js";
 
@@ -86,5 +87,89 @@ describe("releaseLock failures", () => {
     await expect(sm.triggerEvent("nope")).rejects.toBeInstanceOf(
       WrongEventForStateError,
     );
+  });
+});
+
+/**
+ * Mutex whose release fails by RETURNING FALSE rather than throwing — the
+ * failure signal defined by LockAdapterInterface, and what the documented
+ * PostgreSQL advisory-lock adapter produces on a failed unlock.
+ */
+class FalseReleaseMutex implements MutexInterface {
+  acquireCount = 0;
+  releaseCount = 0;
+  private acquired = false;
+  async acquireLock(): Promise<boolean> {
+    this.acquireCount += 1;
+    if (this.acquired) return false;
+    this.acquired = true;
+    return true;
+  }
+  async releaseLock(): Promise<boolean> {
+    this.releaseCount += 1;
+    return false; // release failed; the lock is still held
+  }
+  isAcquired(): boolean {
+    return this.acquired;
+  }
+  async isLocked(): Promise<boolean> {
+    return this.acquired;
+  }
+}
+
+describe("releaseLock reporting failure by returning false", () => {
+  const buildProcess = () =>
+    new ProcessBuilder("p")
+      .addState("a", { initial: true })
+      .addState("b")
+      .addTransition("a", "b", { event: "go" })
+      .build();
+
+  it("rejects the operation instead of resolving as if the lock were freed", async () => {
+    const sm = new Statemachine({}, buildProcess(), {
+      mutex: new FalseReleaseMutex(),
+    });
+    // Silently resolving would let every later operation piggyback on — and
+    // never release — a lock the engine believes it dropped.
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(
+      LockCanNotBeReleasedError,
+    );
+    // The transition itself committed before the release ran.
+    expect(sm.getCurrentState().getName()).toBe("b");
+  });
+
+  it("reports the failure through onReleaseError", async () => {
+    const releaseErrors: unknown[] = [];
+    const sm = new Statemachine({}, buildProcess(), {
+      mutex: new FalseReleaseMutex(),
+      onReleaseError: (err) => releaseErrors.push(err),
+    });
+    await expect(sm.triggerEvent("go")).rejects.toBeInstanceOf(
+      LockCanNotBeReleasedError,
+    );
+    expect(releaseErrors).toHaveLength(1);
+    expect(releaseErrors[0]).toBeInstanceOf(LockCanNotBeReleasedError);
+  });
+
+  it("does not mask an operation error with the release failure", async () => {
+    const sm = new Statemachine({}, buildProcess(), {
+      mutex: new FalseReleaseMutex(),
+    });
+    await expect(sm.triggerEvent("nope")).rejects.toBeInstanceOf(
+      WrongEventForStateError,
+    );
+  });
+
+  it("reports a failed manual release through onReleaseError", async () => {
+    const releaseErrors: unknown[] = [];
+    const sm = new Statemachine({}, buildProcess(), {
+      mutex: new FalseReleaseMutex(),
+      autoreleaseLock: false,
+      onReleaseError: (err) => releaseErrors.push(err),
+    });
+    await sm.acquireLock();
+    await sm.releaseLock();
+    expect(releaseErrors).toHaveLength(1);
+    expect(releaseErrors[0]).toBeInstanceOf(LockCanNotBeReleasedError);
   });
 });

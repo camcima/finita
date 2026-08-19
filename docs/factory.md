@@ -49,7 +49,8 @@ flowchart TD
 ```typescript
 new Factory<TSubject = unknown>(
   processDetector: ProcessDetectorInterface<TSubject>,
-  stateNameDetector?: StateNameDetectorInterface<TSubject> | null
+  stateNameDetector?: StateNameDetectorInterface<TSubject> | null,
+  options?: FactoryStatemachineOptions<TSubject>
 )
 ```
 
@@ -57,6 +58,33 @@ new Factory<TSubject = unknown>(
 | ------------------- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
 | `processDetector`   | `ProcessDetectorInterface<TSubject>`           | (required) | Determines which process to use for the subject                           |
 | `stateNameDetector` | `StateNameDetectorInterface<TSubject> \| null` | `null`     | Detects the current state from the subject (for restoring state machines) |
+| `options`           | `FactoryStatemachineOptions<TSubject>`         | `{}`       | Engine options applied to every machine the factory creates               |
+
+### Engine options
+
+`FactoryStatemachineOptions` is `StatemachineOptions` without the three fields
+the factory derives per subject — `initialStateName` (from the state-name
+detector), `mutex` (from the mutex factory) and `transitionSelector` (from
+`setTransitionSelector`). Everything else is forwarded unchanged:
+`autoreleaseLock`, `maxAutomaticHops`, `maxQueueLength`,
+`onChainedOperationError` and `onReleaseError`.
+
+This matters most for the fleet use case the factory exists to serve: without
+it, a service creating one machine per order would silently run every machine
+on the defaults, with no back-pressure and no diagnostic sinks.
+
+```typescript
+const factory = new Factory(
+  new SingleProcessDetector(orderProcess),
+  new StatefulStateNameDetector(),
+  {
+    maxQueueLength: 100,
+    onChainedOperationError: (error, info) =>
+      logger.error("chained op failed", { error, event: info.eventName }),
+    onReleaseError: (error) => logger.error("lock release failed", { error }),
+  },
+);
+```
 
 ### Methods
 

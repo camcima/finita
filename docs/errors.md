@@ -7,6 +7,7 @@ Custom error classes thrown by the state machine.
 - [FinitaError](#finitaerror)
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
+- [LockCanNotBeReleasedError](#lockcannotbereleasederror)
 - [DuplicateStateError](#duplicatestateerror)
 - [ProcessFinalizedError](#processfinalizederror)
 - [GraphValidationError](#graphvalidationerror)
@@ -106,6 +107,39 @@ This error is thrown when:
 - `checkTransitions()` is called but the mutex `acquireLock()` returns `false`
 
 With the default `NullMutex`, this error is never thrown because `acquireLock()` always returns `true`. It only occurs when using a real locking mechanism (e.g., `LockAdapterMutex`) and the lock is held by another process.
+
+---
+
+## LockCanNotBeReleasedError
+
+**Import:** `import { LockCanNotBeReleasedError } from '@camcima/finita'`
+
+Thrown when the mutex reports a failed release by returning `false` — the failure signal `MutexInterface` and `LockAdapterInterface` define (a PostgreSQL advisory unlock that returns `false`, a Redis `DEL` that removed nothing).
+
+### Properties
+
+| Property  | Type     | Description                                                                             |
+| --------- | -------- | --------------------------------------------------------------------------------------- |
+| `code`    | `string` | `'lockCanNotBeReleased'`                                                                |
+| `message` | `string` | `'Lock can not be released! releaseLock() returned false; the lock may still be held.'` |
+
+### When It's Thrown
+
+After a top-level operation completes, the engine releases the lock it acquired. If that release fails — whether the mutex **throws** or **returns `false`** — the failure is reported to `onReleaseError`, and:
+
+- if the operation itself succeeded, the caller's promise rejects with the release error, because the lock may still be held;
+- if the operation itself failed, the caller's promise rejects with the **operation** error (the release error is not masked over it) and `onReleaseError` is the only place the release failure appears.
+
+A failed release must never be mistaken for a successful one: the engine skips acquisition when the mutex reports it is already held, so a silently stuck lock would let every later operation piggyback on it and never release it.
+
+`Statemachine.releaseLock()` (manual lock management) reports failures through `onReleaseError` but does **not** throw, preserving its `Promise<void>` contract. Inspect `isLockAcquired()` to confirm the lock was freed.
+
+```typescript
+const sm = new Statemachine(order, process, {
+  mutex,
+  onReleaseError: (error) => logger.error("lock release failed", { error }),
+});
+```
 
 ---
 
@@ -401,11 +435,36 @@ Thrown by `OneOrNoneActiveTransition.selectTransition(transitions)` when more th
 
 ### Properties
 
-| Property      | Type                    | Description                      |
-| ------------- | ----------------------- | -------------------------------- |
-| `code`        | `"ambiguousTransition"` | Discriminator                    |
-| `activeCount` | `number`                | How many transitions were active |
-| `name`        | `string`                | `'AmbiguousTransitionError'`     |
+| Property      | Type                                      | Description                           |
+| ------------- | ----------------------------------------- | ------------------------------------- |
+| `code`        | `"ambiguousTransition"`                   | Discriminator                         |
+| `activeCount` | `number`                                  | How many transitions were active      |
+| `candidates`  | `readonly AmbiguousTransitionCandidate[]` | The competing transitions (see below) |
+| `name`        | `string`                                  | `'AmbiguousTransitionError'`          |
+
+### `AmbiguousTransitionCandidate` shape
+
+Each candidate describes one of the simultaneously-active transitions, which is what you need to resolve the ambiguity — a count alone does not identify the culprits. The candidates are also rendered into the error message.
+
+```typescript
+interface AmbiguousTransitionCandidate {
+  targetStateName: string;
+  eventName: string | null; // null for automatic transitions
+  conditionName: string | null;
+  weight: number;
+}
+```
+
+```typescript
+try {
+  await sm.triggerEvent("submit");
+} catch (error) {
+  if (error instanceof AmbiguousTransitionError) {
+    // e.g. ['approved', 'rejected'] — both guards passed
+    console.log(error.candidates.map((c) => c.targetStateName));
+  }
+}
+```
 
 ---
 
@@ -434,7 +493,7 @@ Concretely, the error is thrown on the automatic hop _after_ `maxAutomaticHops` 
 
 **Import:** `import { ReentrancyError } from '@camcima/finita'`
 
-Rejects the promise returned by `triggerEvent()` / `checkTransitions()` when either is called from inside an observer, condition, or transition selector of the **same** `Statemachine` — before the callback's first `await`. Awaiting such a call would deadlock permanently: the machine runs one operation at a time, and the runner is blocked waiting for your callback to finish.
+Rejects the promise returned by `triggerEvent()` / `checkTransitions()` / `whenIdle()` when any of them is called from inside an observer, condition, or transition selector of the **same** `Statemachine` — before the callback's first `await`. Awaiting such a call would deadlock permanently: the machine runs one operation at a time, and the runner is blocked waiting for your callback to finish. (`whenIdle()` is guarded for the same reason: the machine cannot reach idle while the runner is blocked on that very callback.)
 
 **Detection scope:** only the _synchronous portion_ of a callback is guarded. A re-entrant call made **after** a prior `await` inside the callback cannot be detected (that would require Node-only `AsyncLocalStorage`) and will still deadlock silently. Keep re-entrant calls out of callbacks entirely.
 

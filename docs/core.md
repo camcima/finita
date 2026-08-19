@@ -370,21 +370,22 @@ new Statemachine<TSubject = unknown>(
 
 ### Methods
 
-| Method                         | Return Type              | Description                                         |
-| ------------------------------ | ------------------------ | --------------------------------------------------- |
-| `getCurrentState()`            | `StateInterface`         | Returns the current state                           |
-| `getLastState()`               | `StateInterface \| null` | Returns the state before the most recent transition |
-| `getSubject()`                 | `TSubject`               | Returns the managed subject                         |
-| `getProcess()`                 | `ProcessInterface`       | Returns the process                                 |
-| `triggerEvent(name, context?)` | `Promise<void>`          | Triggers a named event on the current state         |
-| `checkTransitions(context?)`   | `Promise<void>`          | Evaluates automatic transitions                     |
-| `acquireLock()`                | `Promise<boolean>`       | Manually acquires the lock                          |
-| `releaseLock()`                | `Promise<void>`          | Manually releases the lock                          |
-| `isLockAcquired()`             | `boolean`                | Checks if the lock is currently acquired            |
-| `isAutoreleaseLock()`          | `boolean`                | Checks if auto-release is enabled                   |
-| `setAutoreleaseLock(value)`    | `void`                   | Enables/disables auto-release                       |
-| `attachBefore(observer)`       | `void`                   | Attaches a `BeforeTransitionObserver`               |
-| `attachAfter(observer)`        | `void`                   | Attaches an `AfterTransitionObserver`               |
+| Method                         | Return Type              | Description                                                 |
+| ------------------------------ | ------------------------ | ----------------------------------------------------------- |
+| `getCurrentState()`            | `StateInterface`         | Returns the current state                                   |
+| `getLastState()`               | `StateInterface \| null` | Returns the state before the most recent transition         |
+| `getSubject()`                 | `TSubject`               | Returns the managed subject                                 |
+| `getProcess()`                 | `ProcessInterface`       | Returns the process                                         |
+| `triggerEvent(name, context?)` | `Promise<void>`          | Triggers a named event on the current state                 |
+| `checkTransitions(context?)`   | `Promise<void>`          | Evaluates automatic transitions                             |
+| `whenIdle()`                   | `Promise<void>`          | Resolves once the queue is drained and the runner is idle   |
+| `acquireLock()`                | `Promise<boolean>`       | Manually acquires the lock                                  |
+| `releaseLock()`                | `Promise<void>`          | Manually releases the lock; failures go to `onReleaseError` |
+| `isLockAcquired()`             | `boolean`                | Checks if the lock is currently acquired                    |
+| `isAutoreleaseLock()`          | `boolean`                | Checks if auto-release is enabled                           |
+| `setAutoreleaseLock(value)`    | `void`                   | Enables/disables auto-release                               |
+| `attachBefore(observer)`       | `void`                   | Attaches a `BeforeTransitionObserver`                       |
+| `attachAfter(observer)`        | `void`                   | Attaches an `AfterTransitionObserver`                       |
 
 ### Event Processing Flow
 
@@ -440,6 +441,12 @@ class AuditObserver implements AfterTransitionObserver {
 const sm = new Statemachine(subject, process);
 sm.attachAfter(new AuditObserver());
 ```
+
+`getBeforeObservers()` and `getAfterObservers()` return a **snapshot**: detaching an observer afterwards does not change a list you already hold, and mutating that list does not change the machine's registrations.
+
+`triggerEvent()`, `checkTransitions()` and `whenIdle()` must not be called on the same machine from inside an observer, condition or selector — see [ReentrancyError](errors.md#reentrancyerror). Use the `EnqueueContext` given to after-observers to chain events instead.
+
+The `frame.context` map is a per-transition copy shared by every observer of that frame; it is `ReadonlyMap` at compile time only. Treat it as read-only — a caller that casts it and mutates will affect the observers that run after it.
 
 ### Concurrency
 

@@ -6,7 +6,21 @@ import type { MutexFactoryInterface } from "../interfaces/MutexFactoryInterface.
 import type { StatemachineInterface } from "../interfaces/StatemachineInterface.js";
 import type { BeforeTransitionObserver } from "../interfaces/BeforeTransitionObserverInterface.js";
 import type { AfterTransitionObserver } from "../interfaces/AfterTransitionObserverInterface.js";
+import type { StatemachineOptions } from "../interfaces/StatemachineOptions.js";
 import { Statemachine } from "../Statemachine.js";
+
+/**
+ * Engine options applied to every machine the factory creates.
+ *
+ * `initialStateName`, `mutex` and `transitionSelector` are excluded: the
+ * factory derives them per subject from the state-name detector, the mutex
+ * factory and setTransitionSelector, so a template value could only
+ * contradict them.
+ */
+export type FactoryStatemachineOptions<TSubject = unknown> = Omit<
+  StatemachineOptions<TSubject>,
+  "initialStateName" | "mutex" | "transitionSelector"
+>;
 
 export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
   private readonly processDetector: ProcessDetectorInterface<TSubject>;
@@ -18,13 +32,23 @@ export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
   private transitionSelector: TransitionSelectorInterface<TSubject> | null =
     null;
   private mutexFactory: MutexFactoryInterface<TSubject> | null = null;
+  private readonly options: FactoryStatemachineOptions<TSubject>;
 
+  /**
+   * @param options Engine options applied to every machine this factory
+   * creates — back-pressure (maxQueueLength), the automatic-hop bound, lock
+   * autorelease, and the onChainedOperationError / onReleaseError diagnostic
+   * sinks. Without them, factory-created machines would silently run on
+   * defaults, which is precisely where those sinks matter most.
+   */
   constructor(
     processDetector: ProcessDetectorInterface<TSubject>,
     stateNameDetector?: StateNameDetectorInterface<TSubject> | null,
+    options: FactoryStatemachineOptions<TSubject> = {},
   ) {
     this.processDetector = processDetector;
     this.stateNameDetector = stateNameDetector ?? null;
+    this.options = { ...options };
   }
 
   setMutexFactory(factory: MutexFactoryInterface<TSubject> | null): void {
@@ -63,6 +87,7 @@ export class Factory<TSubject = unknown> implements FactoryInterface<TSubject> {
       : undefined;
 
     const sm = new Statemachine<TSubject>(subject, process, {
+      ...this.options,
       initialStateName: stateName ?? undefined,
       transitionSelector: this.transitionSelector ?? undefined,
       mutex: mutex ?? undefined,
