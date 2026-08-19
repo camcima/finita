@@ -182,6 +182,19 @@ describe("typed throws", () => {
       expect(e.message).toContain('"b"');
       expect(e.message).toContain('"c"');
       expect(e.message).toContain("isVip");
+      expect(Object.isFrozen(e.candidates)).toBe(true);
+    });
+
+    it("omits the candidate detail when constructed without candidates", () => {
+      // The candidates argument is optional so that a custom
+      // TransitionSelectorInterface can still raise this error with only a
+      // count, exactly as it could before candidates existed.
+      const e = new AmbiguousTransitionError(3);
+      expect(e.activeCount).toBe(3);
+      expect(e.candidates).toEqual([]);
+      expect(e.message).toBe(
+        "More than one transition is active! (active count: 3)",
+      );
     });
   });
 
