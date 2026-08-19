@@ -2,5 +2,7 @@ coverage:
   status:
     project:
       default:
-        target: 80%
+        # Floor, not a goal: the suite currently covers 100% of src/.
+        # Raised from 80% now that full coverage is the established norm.
+        target: 95%
     patch: false
