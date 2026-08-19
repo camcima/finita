@@ -1,7 +1,6 @@
 import type { StatemachineInterface } from "./interfaces/StatemachineInterface.js";
 import type { StateInterface } from "./interfaces/StateInterface.js";
 import type { ProcessInterface } from "./interfaces/ProcessInterface.js";
-import type { TransitionInterface } from "./interfaces/TransitionInterface.js";
 import type { EventInterface } from "./interfaces/EventInterface.js";
 import type { MutexInterface } from "./interfaces/MutexInterface.js";
 import type { TransitionSelectorInterface } from "./interfaces/TransitionSelectorInterface.js";
@@ -19,6 +18,7 @@ import type { QueuedOperation } from "./internal/OperationQueue.js";
 import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
+import { LockCanNotBeReleasedError } from "./error/LockCanNotBeReleasedError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
 import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
@@ -118,8 +118,10 @@ export class Statemachine<
     if (idx >= 0) this.beforeObservers.splice(idx, 1);
   }
 
+  /** Snapshot — detaching later does not change an already-returned list,
+   *  and mutating it does not change the machine's registrations. */
   getBeforeObservers(): Iterable<BeforeTransitionObserver<TSubject>> {
-    return this.beforeObservers;
+    return [...this.beforeObservers];
   }
 
   attachAfter(observer: AfterTransitionObserver<TSubject>): void {
@@ -132,8 +134,9 @@ export class Statemachine<
     if (idx >= 0) this.afterObservers.splice(idx, 1);
   }
 
+  /** Snapshot — see getBeforeObservers. */
   getAfterObservers(): Iterable<AfterTransitionObserver<TSubject>> {
-    return this.afterObservers;
+    return [...this.afterObservers];
   }
 
   // --- public locking ---
@@ -142,8 +145,15 @@ export class Statemachine<
     return this.mutex.acquireLock();
   }
 
+  /**
+   * Releases the mutex. A failed release — whether the mutex throws or
+   * returns false — is reported to the onReleaseError hook; it is not thrown,
+   * so manual lock management keeps its existing control flow. Inspect
+   * isLockAcquired() (or the hook) to learn whether the lock was actually
+   * freed.
+   */
   async releaseLock(): Promise<void> {
-    await this.mutex.releaseLock();
+    await this.releaseMutex();
   }
 
   isLockAcquired(): boolean {
@@ -180,8 +190,14 @@ export class Statemachine<
    * EnqueueContext.enqueue(), has completed. Resolves immediately if the
    * machine is already idle. Note this is a quiescence point, not a
    * receipt: work scheduled later (e.g. from a timer) starts a new drain.
+   *
+   * Like triggerEvent/checkTransitions, this may not be called from inside an
+   * observer or condition of the same machine: the machine cannot reach idle
+   * while the runner is blocked on that very callback, so awaiting it there
+   * always deadlocks.
    */
   whenIdle(): Promise<void> {
+    this.assertNotReentrant("whenIdle()");
     if (!this.running && this.queue.isEmpty()) {
       return Promise.resolve();
     }
@@ -290,23 +306,12 @@ export class Statemachine<
       failure = { err };
     } finally {
       if (acquiredHere && this.autoreleaseLock) {
-        try {
-          await this.mutex.releaseLock();
-        } catch (err) {
-          // Surface every release failure through the diagnostic hook — when
-          // the operation also failed, the rejection carries the operation
-          // error and this hook is the only place the release error appears.
-          try {
-            this.onReleaseError?.(err);
-          } catch {
-            /* a throwing hook must not mask engine errors */
-          }
-          // A release failure must not mask an operation error, but when the
-          // operation succeeded the caller must learn the lock may still be
-          // held — otherwise every later operation silently piggybacks on
-          // (and never releases) the stuck lock.
-          if (!failure) failure = { err };
-        }
+        const releaseFailure = await this.releaseMutex();
+        // A release failure must not mask an operation error, but when the
+        // operation succeeded the caller must learn the lock may still be
+        // held — otherwise every later operation silently piggybacks on
+        // (and never releases) the stuck lock.
+        if (releaseFailure && !failure) failure = releaseFailure;
       }
     }
     if (failure) {
@@ -314,6 +319,38 @@ export class Statemachine<
     } else {
       op.resolve();
     }
+  }
+
+  /**
+   * Releases the mutex, normalizing its two failure modes into one result: a
+   * thrown error, and a false return — the failure signal MutexInterface /
+   * LockAdapterInterface define (a PostgreSQL advisory unlock that returns
+   * false, a Redis DEL that removed nothing). A false return means the lock
+   * may still be held, so it must never be mistaken for a successful release.
+   *
+   * Every failure is surfaced through the diagnostic hook — when the
+   * operation also failed, the rejection carries the operation error and this
+   * hook is the only place the release error appears.
+   *
+   * @returns null on success, or the failure wrapped for the caller to raise.
+   */
+  private async releaseMutex(): Promise<{ err: unknown } | null> {
+    let failure: { err: unknown } | null = null;
+    try {
+      if (!(await this.mutex.releaseLock())) {
+        failure = { err: new LockCanNotBeReleasedError() };
+      }
+    } catch (err) {
+      failure = { err };
+    }
+    if (failure) {
+      try {
+        this.onReleaseError?.(failure.err);
+      } catch {
+        /* a throwing hook must not mask engine errors */
+      }
+    }
+    return failure;
   }
 
   private resolveEvent(name: string): EventInterface {
@@ -369,7 +406,7 @@ export class Statemachine<
       );
       const selected = this.guardSync(() =>
         this.transitionSelector.selectTransition(active),
-      ) as TransitionInterface<TSubject> | null;
+      );
 
       if (!selected) {
         return;

@@ -1,6 +1,7 @@
 export { FinitaError } from "./FinitaError.js";
 export { WrongEventForStateError } from "./WrongEventForStateError.js";
 export { LockCanNotBeAcquiredError } from "./LockCanNotBeAcquiredError.js";
+export { LockCanNotBeReleasedError } from "./LockCanNotBeReleasedError.js";
 export { DuplicateStateError } from "./DuplicateStateError.js";
 export { ProcessFinalizedError } from "./ProcessFinalizedError.js";
 export { GraphValidationError } from "./GraphValidationError.js";
@@ -15,3 +16,4 @@ export { ReentrancyError } from "./ReentrancyError.js";
 export { QueueLimitExceededError } from "./QueueLimitExceededError.js";
 export type { GraphValidationCode } from "./GraphValidationError.js";
 export type { DuplicateTransitionConflict } from "./DuplicateTransitionError.js";
+export type { AmbiguousTransitionCandidate } from "./AmbiguousTransitionError.js";

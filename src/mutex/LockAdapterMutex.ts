@@ -5,17 +5,33 @@ export class LockAdapterMutex implements MutexInterface {
   private readonly lockAdapter: LockAdapterInterface;
   private readonly resourceName: string;
   private acquired = false;
+  private pendingAcquire: Promise<boolean> | null = null;
 
   constructor(lockAdapter: LockAdapterInterface, resourceName: string) {
     this.lockAdapter = lockAdapter;
     this.resourceName = resourceName;
   }
 
+  /**
+   * Overlapping calls share one underlying acquire: the `acquired` flag is
+   * only set after the adapter resolves, so without this both callers would
+   * pass the check and acquire twice on a non-idempotent adapter (database
+   * advisory locks, redis SET NX). The pending promise is cleared once it
+   * settles, so a failed acquire can still be retried.
+   */
   async acquireLock(): Promise<boolean> {
-    if (!this.acquired) {
-      this.acquired = await this.lockAdapter.acquireLock(this.resourceName);
+    if (this.acquired) {
+      return true;
     }
-    return this.acquired;
+    this.pendingAcquire ??= (async () => {
+      try {
+        this.acquired = await this.lockAdapter.acquireLock(this.resourceName);
+        return this.acquired;
+      } finally {
+        this.pendingAcquire = null;
+      }
+    })();
+    return this.pendingAcquire;
   }
 
   async releaseLock(): Promise<boolean> {

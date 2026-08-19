@@ -87,12 +87,12 @@ new LockAdapterMutex(lockAdapter: LockAdapterInterface, resourceName: string)
 
 ### Methods
 
-| Method          | Returns            | Behavior                                                                                                             |
-| --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `acquireLock()` | `Promise<boolean>` | If not already acquired, delegates to `lockAdapter.acquireLock(resourceName)`. Returns result.                       |
-| `releaseLock()` | `Promise<boolean>` | If acquired, delegates to `lockAdapter.releaseLock(resourceName)`. Returns result. If not acquired, returns `false`. |
-| `isAcquired()`  | `boolean`          | Returns local acquired state                                                                                         |
-| `isLocked()`    | `Promise<boolean>` | Delegates to `lockAdapter.isLocked(resourceName)`                                                                    |
+| Method          | Returns            | Behavior                                                                                                                                                                                                                                   |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `acquireLock()` | `Promise<boolean>` | If not already acquired, delegates to `lockAdapter.acquireLock(resourceName)`. Returns result. Overlapping calls share one underlying acquire, so a non-idempotent adapter is never acquired twice; a failed acquire can still be retried. |
+| `releaseLock()` | `Promise<boolean>` | If acquired, delegates to `lockAdapter.releaseLock(resourceName)`. Returns result. If not acquired, returns `false`.                                                                                                                       |
+| `isAcquired()`  | `boolean`          | Returns local acquired state                                                                                                                                                                                                               |
+| `isLocked()`    | `Promise<boolean>` | Delegates to `lockAdapter.isLocked(resourceName)`                                                                                                                                                                                          |
 
 ### Example
 
@@ -337,7 +337,15 @@ sequenceDiagram
 
 ## Release Error Behavior
 
-If the automatic release throws while the operation also failed, the caller's rejection carries the operation error; pass `onReleaseError` in `StatemachineOptions` to observe the release failure (e.g. to alert that the lock may still be held).
+A release fails in one of two ways, and the engine treats them identically: the mutex **throws**, or it **returns `false`** — the failure signal this interface defines (a PostgreSQL advisory unlock returning `false`, a Redis `DEL` that removed nothing).
+
+When the automatic release fails:
+
+- `onReleaseError` (in `StatemachineOptions`) is called with the error — a `LockCanNotBeReleasedError` for the `false` case;
+- if the operation itself succeeded, the caller's promise **rejects**, because the lock may still be held. Silently resolving would let every later operation piggyback on a stuck lock and never release it (the engine skips acquisition whenever the mutex reports it is already held);
+- if the operation itself failed, the caller's rejection carries the **operation** error, and `onReleaseError` is the only place the release failure appears.
+
+`Statemachine.releaseLock()` (manual lock management) reports failures through `onReleaseError` but does not throw, preserving its `Promise<void>` contract; check `isLockAcquired()` to confirm the lock was actually freed.
 
 ## Manual Lock Management
 

@@ -143,3 +143,56 @@ describe("Statemachine mutex regression", () => {
     expect(mutex.isAcquired()).toBe(false);
   });
 });
+
+describe("LockAdapterMutex concurrent acquire", () => {
+  it("acquires the underlying lock once when two acquires overlap", async () => {
+    let adapterAcquires = 0;
+    const adapter: LockAdapterInterface = {
+      async acquireLock(): Promise<boolean> {
+        adapterAcquires += 1;
+        await new Promise((r) => setTimeout(r, 10));
+        return true;
+      },
+      async releaseLock(): Promise<boolean> {
+        return true;
+      },
+      async isLocked(): Promise<boolean> {
+        return true;
+      },
+    };
+    const mutex = new LockAdapterMutex(adapter, "resource");
+
+    // Both calls start before either resolves — the `!this.acquired` check
+    // alone lets both through and double-acquires a non-idempotent adapter.
+    const [first, second] = await Promise.all([
+      mutex.acquireLock(),
+      mutex.acquireLock(),
+    ]);
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    expect(adapterAcquires).toBe(1);
+    expect(mutex.isAcquired()).toBe(true);
+  });
+
+  it("retries after a failed acquire", async () => {
+    let adapterAcquires = 0;
+    const adapter: LockAdapterInterface = {
+      async acquireLock(): Promise<boolean> {
+        adapterAcquires += 1;
+        return adapterAcquires > 1; // first attempt fails, later ones succeed
+      },
+      async releaseLock(): Promise<boolean> {
+        return true;
+      },
+      async isLocked(): Promise<boolean> {
+        return false;
+      },
+    };
+    const mutex = new LockAdapterMutex(adapter, "resource");
+
+    expect(await mutex.acquireLock()).toBe(false);
+    expect(await mutex.acquireLock()).toBe(true);
+    expect(adapterAcquires).toBe(2);
+  });
+});

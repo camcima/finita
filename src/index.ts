@@ -95,6 +95,7 @@ export {
   AbstractNamedProcessDetector,
   StatefulStateNameDetector,
 } from "./factory/index.js";
+export type { FactoryStatemachineOptions } from "./factory/index.js";
 
 // Graph
 export { GraphBuilder } from "./graph/index.js";
@@ -112,6 +113,7 @@ export {
   FinitaError,
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
+  LockCanNotBeReleasedError,
   DuplicateStateError,
   ProcessFinalizedError,
   GraphValidationError,
@@ -128,4 +130,5 @@ export {
 export type {
   GraphValidationCode,
   DuplicateTransitionConflict,
+  AmbiguousTransitionCandidate,
 } from "./error/index.js";

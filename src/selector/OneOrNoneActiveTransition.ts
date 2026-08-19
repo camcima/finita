@@ -15,7 +15,15 @@ export class OneOrNoneActiveTransition<
       case 1:
         return arr[0];
       default:
-        throw new AmbiguousTransitionError(arr.length);
+        throw new AmbiguousTransitionError(
+          arr.length,
+          arr.map((transition) => ({
+            targetStateName: transition.getTargetState().getName(),
+            eventName: transition.getEventName(),
+            conditionName: transition.getConditionName(),
+            weight: transition.getWeight(),
+          })),
+        );
     }
   }
 }

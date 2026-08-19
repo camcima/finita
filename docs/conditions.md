@@ -272,6 +272,14 @@ class Subscription {
 
 The condition calculates `lastStateChangedDate + timeoutMs` and returns `true` if that time is in the past (i.e., the timeout has elapsed).
 
+> **`Timeout` is passive — it schedules nothing.** Like every condition, it is only evaluated when something drives the machine. A transition guarded by `Timeout` fires when the elapsed time has passed **and** someone calls `checkTransitions()` (or triggers an event). Nothing happens on its own at the deadline, so drive expiry from your own scheduler:
+>
+> ```typescript
+> setInterval(() => {
+>   void sm.checkTransitions().catch(handleError);
+> }, 60_000);
+> ```
+
 ---
 
 ## AndComposite
