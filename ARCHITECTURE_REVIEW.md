@@ -166,20 +166,26 @@ The "Cleanup" section items also landed (shared composite base, unified name val
 
 Everything non-breaking was fixed on `fix/architecture-review-findings`; each fix landed test-first, with the failing test observed before the change.
 
-| #        | Finding                                              | Status                                                                                                                            |
-| -------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Bug 1    | `releaseLock()` returning false swallowed            | **Fixed** — new `LockCanNotBeReleasedError`; both failure modes normalized in one path                                            |
-| Bug 2    | `whenIdle()` deadlock                                | **Fixed** — guarded with `assertNotReentrant`                                                                                     |
-| 3        | `releaseLock()` discards the mutex result            | **Partly fixed** — failures now reach `onReleaseError`; the `Promise<boolean>` return type is deferred to v5 as breaking          |
-| 4        | Factory cannot configure engine options              | **Fixed** — `FactoryStatemachineOptions` constructor template                                                                     |
-| 7        | Live internal collections escape                     | **Fixed** — observer accessors return snapshots                                                                                   |
-| 8        | Deprecation debt                                     | **Partly fixed** — notices re-dated to v5; removal is itself breaking                                                             |
-| 9        | Redundant cast                                       | **Fixed**                                                                                                                         |
-| 10       | `AmbiguousTransitionError` lacked context            | **Fixed** — carries `candidates`, rendered into the message                                                                       |
-| 12       | `LockAdapterMutex` acquire race                      | **Fixed** — overlapping acquires share one in-flight promise                                                                      |
-| 13       | `readonlyContext` immutability is nominal            | **Documented** in `docs/core.md`                                                                                                  |
-| 15       | Mermaid label quoting                                | **Deferred** — needs verification in a real renderer; it is pinned by tests and docs, so it should not be changed on a hypothesis |
-| 5, 6, 11 | `Event` mutability, `OnEnterObserver`, `machineName` | **Deferred to v5** — all breaking                                                                                                 |
-| 14       | `OperationQueue` uses `shift()`                      | **Deferred** — irrelevant at realistic queue depths                                                                               |
+| #        | Finding                                              | Status                                                                                                                                  |
+| -------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Bug 1    | `releaseLock()` returning false swallowed            | **Fixed** — new `LockCanNotBeReleasedError`; both failure modes normalized in one path                                                  |
+| Bug 2    | `whenIdle()` deadlock                                | **Fixed** — guarded with `assertNotReentrant`                                                                                           |
+| 3        | `releaseLock()` discards the mutex result            | **Partly fixed** — failures now reach `onReleaseError`; the `Promise<boolean>` return type is deferred to v5 as breaking                |
+| 4        | Factory cannot configure engine options              | **Fixed** — `FactoryStatemachineOptions` constructor template                                                                           |
+| 7        | Live internal collections escape                     | **Fixed** — observer accessors return snapshots                                                                                         |
+| 8        | Deprecation debt                                     | **Partly fixed** — notices re-dated to v5; removal is itself breaking                                                                   |
+| 9        | Redundant cast                                       | **Fixed**                                                                                                                               |
+| 10       | `AmbiguousTransitionError` lacked context            | **Fixed** — carries `candidates`, rendered into the message                                                                             |
+| 12       | `LockAdapterMutex` acquire race                      | **Fixed** — overlapping acquires share one in-flight promise                                                                            |
+| 13       | `readonlyContext` immutability is nominal            | **Documented** in `docs/core.md`                                                                                                        |
+| 15       | Mermaid label quoting                                | **Deferred** (#58) — needs verification in a real renderer; it is pinned by tests and docs, so it should not be changed on a hypothesis |
+| 5, 6, 11 | `Event` mutability, `OnEnterObserver`, `machineName` | **Deferred to v5** — all breaking (#53, #54, #56)                                                                                       |
+| 14       | `OperationQueue` uses `shift()`                      | **Deferred** (#63) — irrelevant at realistic queue depths                                                                               |
 
 Also documented in this pass: the passive nature of `Timeout` (`docs/conditions.md`) and the cross-machine sharing of event observers (`docs/observers.md`), both of which are easy to misread from the API alone.
+
+## Open follow-up
+
+Everything still outstanding is tracked in **#64**, which indexes the breaking work batched for the [v5 milestone](https://github.com/camcima/finita/milestone/1) (#53 `Event` immutability and build-time commands, #54 first-class entry hooks, #55 `releaseLock` return type, #56 `processName` rename, #57 deprecation removal) alongside the non-breaking items (#58 Mermaid verification, #59 `AsyncLocalStorage` re-entrancy detection, #60 queue introspection, #61 a `Timeout` scheduler helper, #62 an are-the-types-wrong CI check, #63 queue dequeue cost).
+
+Of those, #59 is the one worth doing first: it is the only remaining item whose failure mode is a silent permanent deadlock — the same class of defect this review found in `whenIdle()`.
