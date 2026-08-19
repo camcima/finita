@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "25 4 * * 1" # Weekly on Monday 04:25 UTC
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
