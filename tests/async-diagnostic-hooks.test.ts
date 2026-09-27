@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest";
 import { ProcessBuilder, Statemachine } from "../src/index.js";
 import type {
   EnqueueContext,
@@ -16,7 +16,12 @@ const unhandled: unknown[] = [];
 const onUnhandled = (reason: unknown): void => {
   unhandled.push(reason);
 };
-process.on("unhandledRejection", onUnhandled);
+beforeAll(() => {
+  process.on("unhandledRejection", onUnhandled);
+});
+afterAll(() => {
+  process.off("unhandledRejection", onUnhandled);
+});
 afterEach(() => {
   unhandled.length = 0;
 });
