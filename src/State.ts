@@ -54,11 +54,13 @@ export class State implements StateInterface {
     return this.name;
   }
 
+  /** Snapshot — the graph is shared by every machine built from the
+   *  process, so callers must never receive the collection itself. */
   getTransitions(): Iterable<TransitionInterface> {
     if (this._transitions === null) {
       return [];
     }
-    return this._transitions;
+    return Array.from(this._transitions);
   }
 
   getEventNames(): string[] {
