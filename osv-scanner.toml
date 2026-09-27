@@ -24,3 +24,15 @@ name = "js-yaml"
 ecosystem = "npm"
 ignore = true
 reason = "Dev-only transitive dep (@commitlint/cli > @commitlint/load > cosmiconfig); not shipped in the published package"
+
+[[PackageOverrides]]
+name = "vitest"
+ecosystem = "npm"
+ignore = true
+reason = "Dev-only test runner; not shipped in the published package. GHSA-82fw-gwwq-j7x9 is fixed only in vitest 4.1.11, a major upgrade tracked in #77"
+
+[[PackageOverrides]]
+name = "@vitest/mocker"
+ecosystem = "npm"
+ignore = true
+reason = "Dev-only transitive dep (vitest > @vitest/mocker); not shipped in the published package. Same advisory and fix as vitest"
