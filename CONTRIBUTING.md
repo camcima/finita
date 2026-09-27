@@ -4,7 +4,8 @@ Thanks for your interest in contributing! This document covers the basics for ge
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+ for development, tests, and builds; CI covers Node 20, 22, and 24
+- Node.js 22.22.2+ or 24.15+ to cut a release, because that is the minimum `release-it` supports
 - pnpm
 
 ## Setup
