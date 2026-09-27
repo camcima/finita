@@ -2,9 +2,23 @@
 
 ## [4.3.0](https://github.com/camcima/finita/compare/v4.2.0...v4.3.0) (2026-09-27)
 
+Remediation of the 2026-09 principal architecture review ([#74](https://github.com/camcima/finita/pull/74), [#76](https://github.com/camcima/finita/pull/76)). Full notes: [v4.3.0 release](https://github.com/camcima/finita/releases/tag/v4.3.0).
+
 ### Features
 
-* address principal architecture review findings ([#74](https://github.com/camcima/finita/issues/74)) ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718)), closes [#63](https://github.com/camcima/finita/issues/63), references [#75](https://github.com/camcima/finita/issues/75)
+* add `LockOwnershipUncertainError`: after a failed release of a held lock, later operations reject instead of running under a lock another worker may now hold ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+
+### Bug Fixes
+
+* retry the adapter in `LockAdapterMutex` after an acquire that threw synchronously ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+* keep synchronous composite conditions inside the re-entrancy check, so a re-entrant later child throws `ReentrancyError` instead of deadlocking ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+* return a snapshot from `State.getTransitions()`, so callers cannot rewrite the shared graph ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+* encode transition identity as a JSON tuple, so names containing NUL no longer collide ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+* contain rejections from async `onReleaseError` and `onChainedOperationError` hooks ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718))
+
+### Performance
+
+* dequeue operations in constant time; draining 100k queued operations drops from about 1.3s to about 5ms ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718)), closes [#63](https://github.com/camcima/finita/issues/63)
 
 ### Documentation
 
