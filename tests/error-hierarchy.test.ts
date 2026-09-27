@@ -5,6 +5,7 @@ import {
   DuplicateTransitionError,
   GraphValidationError,
   LockCanNotBeAcquiredError,
+  LockOwnershipUncertainError,
   ProcessFinalizedError,
   WrongEventForStateError,
 } from "../src/error/index.js";
@@ -41,6 +42,11 @@ describe("FinitaError hierarchy (existing classes)", () => {
       name: "LockCanNotBeAcquiredError",
       instance: new LockCanNotBeAcquiredError(),
       code: "lockCanNotBeAcquired",
+    },
+    {
+      name: "LockOwnershipUncertainError",
+      instance: new LockOwnershipUncertainError(new Error("release failed")),
+      code: "lockOwnershipUncertain",
     },
     {
       name: "ProcessFinalizedError",
