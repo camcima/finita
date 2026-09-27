@@ -296,11 +296,20 @@ new AndComposite<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 
 ### Methods
 
-| Method                             | Return Type        | Description                                                           |
-| ---------------------------------- | ------------------ | --------------------------------------------------------------------- |
-| `addAnd(condition)`                | `this`             | Adds another condition to the AND chain. Returns `this` for chaining. |
-| `getName()`                        | `string`           | Returns `'(A and B and ...)'`                                         |
-| `checkCondition(subject, context)` | `Promise<boolean>` | Returns `true` if all conditions are `true`                           |
+| Method                             | Return Type             | Description                                                           |
+| ---------------------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `addAnd(condition)`                | `this`                  | Adds another condition to the AND chain. Returns `this` for chaining. |
+| `getName()`                        | `string`                | Returns `'(A and B and ...)'`                                         |
+| `checkCondition(subject, context)` | `MaybePromise<boolean>` | Returns `true` if all conditions are `true`                           |
+
+Children are evaluated in order. A child that returns a plain `boolean` is
+consumed synchronously, and the composite itself returns a plain `boolean`
+when every child it evaluated did; it returns a promise only once a child
+does. This keeps synchronous guards inside the machine's re-entrancy check,
+so a later child that calls back into the same machine throws
+`ReentrancyError` instead of deadlocking. `OrComposite` and `Not` behave the
+same way. Code that calls `checkCondition()` directly should `await` the
+result rather than call `.then()` on it.
 
 ### Example
 
@@ -332,11 +341,11 @@ new OrComposite<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 
 ### Methods
 
-| Method                             | Return Type        | Description                                                          |
-| ---------------------------------- | ------------------ | -------------------------------------------------------------------- |
-| `addOr(condition)`                 | `this`             | Adds another condition to the OR chain. Returns `this` for chaining. |
-| `getName()`                        | `string`           | Returns `'(A or B or ...)'`                                          |
-| `checkCondition(subject, context)` | `Promise<boolean>` | Returns `true` if any condition is `true`                            |
+| Method                             | Return Type             | Description                                                          |
+| ---------------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| `addOr(condition)`                 | `this`                  | Adds another condition to the OR chain. Returns `this` for chaining. |
+| `getName()`                        | `string`                | Returns `'(A or B or ...)'`                                          |
+| `checkCondition(subject, context)` | `MaybePromise<boolean>` | Returns `true` if any condition is `true`                            |
 
 ### Example
 
@@ -371,10 +380,10 @@ new Not<TSubject = unknown>(condition: ConditionInterface<TSubject>)
 
 ### Methods
 
-| Method                             | Return Type        | Description                                   |
-| ---------------------------------- | ------------------ | --------------------------------------------- |
-| `getName()`                        | `string`           | Returns `'not ( innerName )'`                 |
-| `checkCondition(subject, context)` | `Promise<boolean>` | Returns `!innerCondition.checkCondition(...)` |
+| Method                             | Return Type             | Description                                   |
+| ---------------------------------- | ----------------------- | --------------------------------------------- |
+| `getName()`                        | `string`                | Returns `'not ( innerName )'`                 |
+| `checkCondition(subject, context)` | `MaybePromise<boolean>` | Returns `!innerCondition.checkCondition(...)` |
 
 ### Example
 

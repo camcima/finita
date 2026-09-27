@@ -1,4 +1,5 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
+import type { MaybePromise } from "../MaybePromise.js";
 import { CompositeCondition } from "./CompositeCondition.js";
 
 export class AndComposite<
@@ -12,15 +13,10 @@ export class AndComposite<
     return this.addCondition(condition);
   }
 
-  async checkCondition(
+  checkCondition(
     subject: TSubject,
     context: Map<string, unknown>,
-  ): Promise<boolean> {
-    for (const condition of this.conditions) {
-      if (!(await condition.checkCondition(subject, context))) {
-        return false;
-      }
-    }
-    return true;
+  ): MaybePromise<boolean> {
+    return this.evaluate(subject, context, false);
   }
 }
