@@ -428,7 +428,7 @@ flowchart TD
     R --> S[Settle the caller's promise]
 ```
 
-1. **Uncertain lock ownership blocks the operation.** After a failed release of a held lock, the operation rejects with `LockOwnershipUncertainError`. See [Release Error Behavior](mutex.md#release-error-behavior).
+1. **Uncertain lock ownership blocks the operation.** Once an earlier operation's release of a held lock has failed, every later operation rejects with `LockOwnershipUncertainError`. The operation whose release failed does not get this error; step 9 describes its outcome. See [Release Error Behavior](mutex.md#release-error-behavior).
 2. **Stale chained operations are skipped.** An operation chained with an expected state, such as an `onEnter` event, resolves without running if the machine has already left that state.
 3. **The lock is acquired first.** It is skipped if the mutex already holds it, as with manual lock management. A failed acquisition rejects with `LockCanNotBeAcquiredError`.
 4. **The event is validated after locking.** An event the current state does not declare fails with `WrongEventForStateError`. Observers attached directly to the event with `event.attach()` then run once, whether or not a transition fires.
@@ -436,7 +436,7 @@ flowchart TD
 6. **Before-observers can veto.** They see the frame while the machine is still in the source state. The first one that throws aborts the operation before the state changes. A self-transition skips the observers and the commit.
 7. **The transition commits, then after-observers run.** Every after-observer runs even if an earlier one throws. Their errors are then rethrown together, so the operation can reject after its transition has already committed.
 8. **Automatic transitions follow.** The loop repeats without an event until no transition is active. More than `maxAutomaticHops` automatic hops fails with `AutomaticTransitionCycleError`, and hops already committed stay committed.
-9. **The lock is released.** This happens only when this operation acquired it and `autoreleaseLock` is `true`. A failed release is reported to `onReleaseError` and rejects an otherwise successful operation.
+9. **The lock is released.** This happens only when this operation acquired it and `autoreleaseLock` is `true`. A failed release is reported to `onReleaseError`. The operation then rejects with the release error, or keeps its own error if it had already failed. A failed release of a held lock also blocks every later operation, as step 1 describes.
 10. **The caller's promise settles last.** Once `await sm.triggerEvent(...)` returns, the lock has already been released.
 
 A failure in any step skips the remaining steps except the lock release.

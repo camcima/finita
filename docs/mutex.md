@@ -251,9 +251,11 @@ async function approve(orderId: string): Promise<void> {
 }
 ```
 
-A second worker that runs `approve` for the same order waits for the lock,
-then loads the already-approved record, and its `triggerEvent` rejects with
-`WrongEventForStateError` instead of approving twice.
+While the first worker holds the lock, a second `approve` for the same order
+fails at once with the busy error. When it retries after the first worker
+releases the lock, it loads the already-approved record, and its
+`triggerEvent` rejects with `WrongEventForStateError` instead of approving
+twice.
 
 Two further safeguards are worth adding:
 
