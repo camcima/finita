@@ -22,6 +22,7 @@ interface MutexInterface {
 - [LockAdapterMutex](#lockadaptermutex)
 - [MutexFactory](#mutexfactory)
 - [LockAdapterInterface](#lockadapterinterface)
+- [Locks and persisted state](#locks-and-persisted-state)
 - [Custom Lock Adapters](#custom-lock-adapters)
 
 ---
@@ -208,6 +209,63 @@ Always construct one mutex per machine — `MutexFactory` does this correctly.
 Cross-machine exclusion comes from sharing the underlying
 `LockAdapterInterface` (same resource name), never from sharing a mutex
 object.
+
+---
+
+## Locks and persisted state
+
+A lock serializes execution. It does not make a machine's state current.
+
+A machine reads its subject's state once, when it is constructed, and keeps
+it in memory. Acquiring the lock later does not reload that state. If two
+machines are built from the same persisted record before either runs, both
+start in the same state. Each takes the lock in turn, and both commit the
+same transition, running its side effects twice. The same happens with a
+long-lived machine whose record another worker has since changed.
+
+Pick one ownership model and route every operation on a subject through it:
+
+- **In memory, one owner.** A single long-lived machine owns the subject's
+  state, and every operation goes through that machine. The machine's own
+  queue serializes the operations, so no mutex is needed.
+- **Persisted, loaded inside the lock.** Take the lock before loading the
+  record, build the machine from what you loaded, trigger the event, persist
+  the new state, and release the lock only after the write commits. The
+  machine can use the default `NullMutex`, because the application already
+  holds the lock around its whole lifetime.
+
+```typescript
+async function approve(orderId: string): Promise<void> {
+  const resource = `order:${orderId}`;
+  if (!(await locks.acquireLock(resource))) {
+    throw new Error("order is busy; retry later");
+  }
+  try {
+    const order = await orders.load(orderId); // fresh, inside the lock
+    const sm = await factory.createStatemachine(order);
+    await sm.triggerEvent("approve");
+    await orders.save(order);
+  } finally {
+    await locks.releaseLock(resource);
+  }
+}
+```
+
+While the first worker holds the lock, a second `approve` for the same order
+fails at once with the busy error. When it retries after the first worker
+releases the lock, it loads the already-approved record, and its
+`triggerEvent` rejects with `WrongEventForStateError` instead of approving
+twice.
+
+Two further safeguards are worth adding:
+
+- **Check a version when persisting.** Write with a condition such as
+  `WHERE version = ?`, or inside a transaction, so a stale write fails even
+  if the locking is misconfigured or a lock lease expires.
+- **Make external side effects idempotent.** After-observers run after the
+  transition commits in memory, and nothing rolls them back if persisting
+  fails later. Use idempotency keys, or record side effects in a
+  transactional outbox that is written with the state.
 
 ---
 
