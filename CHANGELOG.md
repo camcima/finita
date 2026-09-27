@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.3.0](https://github.com/camcima/finita/compare/v4.2.0...v4.3.0) (2026-09-27)
+
+### Features
+
+* address principal architecture review findings ([#74](https://github.com/camcima/finita/issues/74)) ([c7a8ca4](https://github.com/camcima/finita/commit/c7a8ca48dd8a1ec1010821591c612e2e30d71718)), closes [#63](https://github.com/camcima/finita/issues/63), references [#75](https://github.com/camcima/finita/issues/75)
+
+### Documentation
+
+* document persisted-state ownership and the real operation flow ([#76](https://github.com/camcima/finita/issues/76)) ([d9ab220](https://github.com/camcima/finita/commit/d9ab220ae90cf6f8a5a32904c88f858e786c4217))
+
 ## [4.2.0](https://github.com/camcima/finita/compare/v4.1.0...v4.2.0) (2026-08-19)
 
 Remediation of the 2026-08 architecture review ([#52](https://github.com/camcima/finita/pull/52)). Full notes: [v4.2.0 release](https://github.com/camcima/finita/releases/tag/v4.2.0).
