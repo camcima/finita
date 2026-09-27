@@ -220,13 +220,15 @@ export class ProcessBuilder<TSubject = unknown> {
   }
 
   /** Transition identity: (fromState, eventName, toState). Used by both the
-   *  conflict check and the build-time dedup — keep them in lockstep. */
+   *  conflict check and the build-time dedup — keep them in lockstep.
+   *  Encoded as a JSON tuple, not a delimiter join: names may contain any
+   *  character, so no delimiter can keep distinct tuples distinct. */
   private static transitionKey(t: {
     fromState: string;
     eventName: string | null;
     toState: string;
   }): string {
-    return `${t.fromState}\x00${t.eventName ?? ""}\x00${t.toState}`;
+    return JSON.stringify([t.fromState, t.eventName, t.toState]);
   }
 
   private validateNoConflictingDuplicates(): void {
