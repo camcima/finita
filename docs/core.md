@@ -361,12 +361,16 @@ new Statemachine<TSubject = unknown>(
 
 ### `StatemachineOptions`
 
-| Option               | Type                                    | Default                               | Description                                                  |
-| -------------------- | --------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
-| `initialStateName`   | `string`                                | `process.getInitialState().getName()` | Override the starting state                                  |
-| `transitionSelector` | `TransitionSelectorInterface<TSubject>` | `new OneOrNoneActiveTransition()`     | Strategy for selecting among active transitions              |
-| `mutex`              | `MutexInterface`                        | `new NullMutex()`                     | Mutex for concurrency control                                |
-| `autoreleaseLock`    | `boolean`                               | `true`                                | When `true`, lock is released after each top-level operation |
+| Option                    | Type                                    | Default                               | Description                                                                                                                                      |
+| ------------------------- | --------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `initialStateName`        | `string`                                | `process.getInitialState().getName()` | Override the starting state                                                                                                                      |
+| `transitionSelector`      | `TransitionSelectorInterface<TSubject>` | `new OneOrNoneActiveTransition()`     | Strategy for selecting among active transitions                                                                                                  |
+| `mutex`                   | `MutexInterface`                        | `new NullMutex()`                     | Mutex for concurrency control                                                                                                                    |
+| `autoreleaseLock`         | `boolean`                               | `true`                                | When `true`, lock is released after each top-level operation                                                                                     |
+| `maxAutomaticHops`        | `number`                                | `100`                                 | Maximum automatic transitions one operation may take before `AutomaticTransitionCycleError`. Hops already committed are not rolled back          |
+| `maxQueueLength`          | `number`                                | `Infinity`                            | Maximum operations waiting in the queue. Further calls reject with `QueueLimitExceededError`                                                     |
+| `onChainedOperationError` | `(error, info: { eventName }) => void`  | none                                  | Receives failures of operations chained via `EnqueueContext.enqueue()`, which no caller awaits. May be async; failures of the hook are swallowed |
+| `onReleaseError`          | `(error) => void`                       | none                                  | Receives every failed lock release, including ones masked by an operation error. May be async; failures of the hook are swallowed                |
 
 ### Methods
 
@@ -389,34 +393,53 @@ new Statemachine<TSubject = unknown>(
 
 ### Event Processing Flow
 
-When `triggerEvent(name, context?)` is called:
+Every `triggerEvent(name, context?)` and `checkTransitions(context?)` call
+becomes one operation on the machine's FIFO queue. A single runner executes
+operations one at a time, so a call made while another operation runs waits
+its turn. Each operation runs these steps:
 
 ```mermaid
 flowchart TD
-    A[triggerEvent] --> B{Concurrent call?}
-    B -- Yes --> C[Queue operation — run after current op]
-    B -- No --> D{Event exists on\ncurrent state?}
-    D -- No --> E[Throw WrongEventForStateError]
-    D -- Yes --> F[Acquire lock]
-    F --> G{Lock acquired?}
-    G -- No --> H[Throw LockCanNotBeAcquiredError]
-    G -- Yes --> I[Notify before-observers\nProposedTransitionFrame]
-    I --> J{Before-observer threw?}
-    J -- Yes --> K[Abort — reject caller]
-    J -- No --> L[Apply transition\nUpdate currentState]
-    L --> M[Notify after-observers\nTransitionFrame]
-    M --> N[Recurse: check automatic transitions]
-    N --> O[Release lock]
-    O --> P[Drain queued operations]
+    A[Dequeue operation] --> U{Lock ownership\nuncertain?}
+    U -- Yes --> U2[Reject: LockOwnershipUncertainError]
+    U -- No --> B{Chained op whose\nexpected state has passed?}
+    B -- Yes --> B2[Resolve without running]
+    B -- No --> C{Mutex already\nacquired?}
+    C -- No --> D[Acquire lock]
+    D --> D2{Acquired?}
+    D2 -- No --> D3[Reject: LockCanNotBeAcquiredError]
+    D2 -- Yes --> E
+    C -- Yes --> E{Event given?}
+    E -- No --> G
+    E -- Yes --> F{Event exists on\ncurrent state?}
+    F -- No --> F2[Fail: WrongEventForStateError]
+    F -- Yes --> F3[Run event-attached observers]
+    F3 --> G[Evaluate guards and\nselect one transition]
+    G --> H{Transition selected?}
+    H -- No --> R
+    H -- Yes --> I{Target differs from\ncurrent state?}
+    I -- No --> K
+    I -- Yes --> J[Before-observers: a throw vetoes]
+    J --> J2[Commit: update current state]
+    J2 --> J3[After-observers: all run,\nerrors rethrown together]
+    J3 --> K[Continue with automatic\ntransitions, no event]
+    K --> G
+    R[Release lock if acquired here\nand autoreleaseLock is true]
+    R --> S[Settle the caller's promise]
 ```
 
-1. If a concurrent call arrives it is queued and runs after the current top-level operation completes
-2. `triggerEvent()` validates the event exists on the current state
-3. The lock is acquired (throws `LockCanNotBeAcquiredError` if it fails)
-4. Before-observers receive a `ProposedTransitionFrame`; throwing aborts the transition
-5. The state changes and after-observers receive a frozen `TransitionFrame`
-6. Automatic transitions are checked recursively from the new state
-7. The lock is auto-released (if `autoreleaseLock` is `true`)
+1. **Uncertain lock ownership blocks the operation.** After a failed release of a held lock, the operation rejects with `LockOwnershipUncertainError`. See [Release Error Behavior](mutex.md#release-error-behavior).
+2. **Stale chained operations are skipped.** An operation chained with an expected state, such as an `onEnter` event, resolves without running if the machine has already left that state.
+3. **The lock is acquired first.** It is skipped if the mutex already holds it, as with manual lock management. A failed acquisition rejects with `LockCanNotBeAcquiredError`.
+4. **The event is validated after locking.** An event the current state does not declare fails with `WrongEventForStateError`. Observers attached directly to the event with `event.attach()` then run once, whether or not a transition fires.
+5. **Guards are evaluated and one transition is selected.** Each transition's condition is checked, and the transition selector picks one active transition or none. The default selector throws `AmbiguousTransitionError` when several are active.
+6. **Before-observers can veto.** They see the frame while the machine is still in the source state. The first one that throws aborts the operation before the state changes. A self-transition skips the observers and the commit.
+7. **The transition commits, then after-observers run.** Every after-observer runs even if an earlier one throws. Their errors are then rethrown together, so the operation can reject after its transition has already committed.
+8. **Automatic transitions follow.** The loop repeats without an event until no transition is active. More than `maxAutomaticHops` automatic hops fails with `AutomaticTransitionCycleError`, and hops already committed stay committed.
+9. **The lock is released.** This happens only when this operation acquired it and `autoreleaseLock` is `true`. A failed release is reported to `onReleaseError` and rejects an otherwise successful operation.
+10. **The caller's promise settles last.** Once `await sm.triggerEvent(...)` returns, the lock has already been released.
+
+A failure in any step skips the remaining steps except the lock release.
 
 ### Observers
 
