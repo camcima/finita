@@ -22,6 +22,7 @@ import { LockCanNotBeReleasedError } from "./error/LockCanNotBeReleasedError.js"
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
 import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
+import { isPromiseLike } from "./util/index.js";
 
 export class Statemachine<
   TSubject = unknown,
@@ -46,11 +47,8 @@ export class Statemachine<
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
 
-  private readonly onChainedOperationError?: (
-    error: unknown,
-    info: { eventName: string },
-  ) => void;
-  private readonly onReleaseError?: (error: unknown) => void;
+  private readonly onChainedOperationError?: StatemachineOptions<TSubject>["onChainedOperationError"];
+  private readonly onReleaseError?: StatemachineOptions<TSubject>["onReleaseError"];
 
   constructor(
     subject: TSubject,
@@ -344,13 +342,30 @@ export class Statemachine<
       failure = { err };
     }
     if (failure) {
-      try {
-        this.onReleaseError?.(failure.err);
-      } catch {
-        /* a throwing hook must not mask engine errors */
-      }
+      const err = failure.err;
+      this.callDiagnosticHook(() => this.onReleaseError?.(err));
     }
     return failure;
+  }
+
+  /**
+   * Runs a user diagnostic hook in isolation. Neither a synchronous throw nor
+   * a rejection of a returned promise may reach the drain loop or the host:
+   * an unavailable telemetry backend must not fail an operation or, via an
+   * unhandled rejection, terminate the process. A returned promise is
+   * deliberately not awaited — a slow reporter must not stall the runner.
+   */
+  private callDiagnosticHook(hook: () => unknown): void {
+    try {
+      const result = hook();
+      if (isPromiseLike(result)) {
+        result.then(undefined, () => {
+          /* swallow hook failures */
+        });
+      }
+    } catch {
+      /* swallow hook failures */
+    }
   }
 
   private resolveEvent(name: string): EventInterface {
@@ -459,15 +474,12 @@ export class Statemachine<
               },
               (err) => {
                 // Chained errors do not propagate to the original caller;
-                // surface them through the optional sink instead. The sink
-                // must never throw into the drain loop.
-                try {
+                // surface them through the optional sink instead.
+                this.callDiagnosticHook(() =>
                   this.onChainedOperationError?.(err, {
                     eventName: chainedEventName,
-                  });
-                } catch {
-                  /* swallow hook failures */
-                }
+                  }),
+                );
               },
               ifStateName,
             );

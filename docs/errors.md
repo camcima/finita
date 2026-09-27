@@ -132,6 +132,8 @@ After a top-level operation completes, the engine releases the lock it acquired.
 
 A failed release must never be mistaken for a successful one: the engine skips acquisition when the mutex reports it is already held, so a silently stuck lock would let every later operation piggyback on it and never release it.
 
+Both diagnostic hooks, `onReleaseError` and `onChainedOperationError`, may be async. The engine does not await them, and it swallows both a synchronous throw and a rejection of the returned promise, so an unavailable logging backend can neither change the operation's outcome nor surface as an unhandled rejection.
+
 `Statemachine.releaseLock()` (manual lock management) reports failures through `onReleaseError` but does **not** throw, preserving its `Promise<void>` contract. Inspect `isLockAcquired()` to confirm the lock was freed.
 
 ```typescript
