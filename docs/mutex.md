@@ -347,6 +347,22 @@ When the automatic release fails:
 
 `Statemachine.releaseLock()` (manual lock management) reports failures through `onReleaseError` but does not throw, preserving its `Promise<void>` contract; check `isLockAcquired()` to confirm the lock was actually freed.
 
+### Uncertain ownership after a failed release
+
+Reporting the failure is not enough to keep later work safe. A failed release leaves two possibilities the machine cannot tell apart:
+
+- the unlock **never happened**, so the machine still holds the lock;
+- the unlock **did happen** remotely but its reply was lost, so another worker may already hold the lock.
+
+Operations used to keep running on the mutex's old "acquired" flag, skipping acquisition, and could therefore execute while another machine held the lock. Now, once releasing a held lock fails, every queued, chained, or later operation on that machine rejects with `LockOwnershipUncertainError` before it touches the mutex or runs any callback. The error's `cause` is the release failure. Chained operations report it through `onChainedOperationError`.
+
+To recover:
+
+1. Call `sm.releaseLock()`. If the release now succeeds, the machine resumes normal operation and the next operation acquires the lock afresh.
+2. If it still fails, ownership cannot be confirmed. This is expected when the first unlock actually happened, because an ownership-checked unlock then removes nothing. Discard the machine and build a new one from persisted state, for example with `Factory.createStatemachine()`.
+
+A manual `releaseLock()` of a lock the mutex does not claim to hold is still reported to `onReleaseError`, but it never blocks the machine, so defensive releases in `finally` blocks stay safe.
+
 ## Manual Lock Management
 
 By default, the state machine acquires and releases the lock automatically around each `triggerEvent()` or `checkTransitions()` call. You can disable this for batch operations:

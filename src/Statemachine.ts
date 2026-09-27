@@ -19,6 +19,7 @@ import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 import { LockCanNotBeReleasedError } from "./error/LockCanNotBeReleasedError.js";
+import { LockOwnershipUncertainError } from "./error/LockOwnershipUncertainError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
 import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
@@ -43,6 +44,8 @@ export class Statemachine<
   private running = false;
   private idleWaiters: Array<() => void> = [];
   private inSyncCallback = false;
+  /** Set when releasing a held lock fails; see LockOwnershipUncertainError. */
+  private ownershipUncertainty: { err: unknown } | null = null;
 
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
@@ -149,6 +152,9 @@ export class Statemachine<
    * so manual lock management keeps its existing control flow. Inspect
    * isLockAcquired() (or the hook) to learn whether the lock was actually
    * freed.
+   *
+   * A failed release of a held lock makes every later operation reject with
+   * LockOwnershipUncertainError; a successful call here is how to recover.
    */
   async releaseLock(): Promise<void> {
     await this.releaseMutex();
@@ -269,6 +275,15 @@ export class Statemachine<
   }
 
   private async runOperation(op: QueuedOperation): Promise<void> {
+    // After a failed release the ownership flag is unreliable: the unlock
+    // may have happened remotely with its reply lost. Running on it would
+    // skip acquisition and execute under a lock another machine may now
+    // hold, so reject before touching the mutex or any callback.
+    if (this.ownershipUncertainty) {
+      op.reject(new LockOwnershipUncertainError(this.ownershipUncertainty.err));
+      return;
+    }
+
     if (
       op.ifStateName !== undefined &&
       this.currentState.getName() !== op.ifStateName
@@ -330,9 +345,15 @@ export class Statemachine<
    * operation also failed, the rejection carries the operation error and this
    * hook is the only place the release error appears.
    *
+   * A failure while the mutex claimed to hold the lock leaves ownership
+   * uncertain and blocks later operations; a success clears that state. A
+   * failed release of a lock the mutex did not claim (a defensive manual
+   * release) is still reported but changes nothing.
+   *
    * @returns null on success, or the failure wrapped for the caller to raise.
    */
   private async releaseMutex(): Promise<{ err: unknown } | null> {
+    const held = this.mutex.isAcquired();
     let failure: { err: unknown } | null = null;
     try {
       if (!(await this.mutex.releaseLock())) {
@@ -342,8 +363,11 @@ export class Statemachine<
       failure = { err };
     }
     if (failure) {
+      if (held) this.ownershipUncertainty = failure;
       const err = failure.err;
       this.callDiagnosticHook(() => this.onReleaseError?.(err));
+    } else {
+      this.ownershipUncertainty = null;
     }
     return failure;
   }

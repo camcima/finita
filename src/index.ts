@@ -114,6 +114,7 @@ export {
   WrongEventForStateError,
   LockCanNotBeAcquiredError,
   LockCanNotBeReleasedError,
+  LockOwnershipUncertainError,
   DuplicateStateError,
   ProcessFinalizedError,
   GraphValidationError,

@@ -8,6 +8,7 @@ Custom error classes thrown by the state machine.
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
 - [LockCanNotBeReleasedError](#lockcannotbereleasederror)
+- [LockOwnershipUncertainError](#lockownershipuncertainerror)
 - [DuplicateStateError](#duplicatestateerror)
 - [ProcessFinalizedError](#processfinalizederror)
 - [GraphValidationError](#graphvalidationerror)
@@ -142,6 +143,25 @@ const sm = new Statemachine(order, process, {
   onReleaseError: (error) => logger.error("lock release failed", { error }),
 });
 ```
+
+---
+
+## LockOwnershipUncertainError
+
+**Import:** `import { LockOwnershipUncertainError } from '@camcima/finita'`
+
+Rejects an operation because an earlier release of a held lock failed. The machine cannot tell whether the unlock happened, so it refuses to run further work on its old ownership flag.
+
+### Properties
+
+| Property | Type      | Description                                     |
+| -------- | --------- | ----------------------------------------------- |
+| `code`   | `string`  | `'lockOwnershipUncertain'`                      |
+| `cause`  | `unknown` | The release failure that made ownership unclear |
+
+### When It's Thrown
+
+Every operation queued behind, chained from, or started after a failed release of a held lock rejects with this error until a manual `Statemachine.releaseLock()` succeeds. If that release cannot succeed, discard the machine and rebuild it from persisted state. See [Release Error Behavior](mutex.md#release-error-behavior) for the full recovery procedure.
 
 ---
 
