@@ -19,9 +19,11 @@ import { ActiveTransitionFilter } from "./filter/ActiveTransitionFilter.js";
 import { WrongEventForStateError } from "./error/WrongEventForStateError.js";
 import { LockCanNotBeAcquiredError } from "./error/LockCanNotBeAcquiredError.js";
 import { LockCanNotBeReleasedError } from "./error/LockCanNotBeReleasedError.js";
+import { LockOwnershipUncertainError } from "./error/LockOwnershipUncertainError.js";
 import { AutomaticTransitionCycleError } from "./error/AutomaticTransitionCycleError.js";
 import { ReentrancyError } from "./error/ReentrancyError.js";
 import { QueueLimitExceededError } from "./error/QueueLimitExceededError.js";
+import { isPromiseLike } from "./util/index.js";
 
 export class Statemachine<
   TSubject = unknown,
@@ -42,15 +44,14 @@ export class Statemachine<
   private running = false;
   private idleWaiters: Array<() => void> = [];
   private inSyncCallback = false;
+  /** Set when releasing a held lock fails; see LockOwnershipUncertainError. */
+  private ownershipUncertainty: { err: unknown } | null = null;
 
   private readonly beforeObservers: BeforeTransitionObserver<TSubject>[] = [];
   private readonly afterObservers: AfterTransitionObserver<TSubject>[] = [];
 
-  private readonly onChainedOperationError?: (
-    error: unknown,
-    info: { eventName: string },
-  ) => void;
-  private readonly onReleaseError?: (error: unknown) => void;
+  private readonly onChainedOperationError?: StatemachineOptions<TSubject>["onChainedOperationError"];
+  private readonly onReleaseError?: StatemachineOptions<TSubject>["onReleaseError"];
 
   constructor(
     subject: TSubject,
@@ -151,6 +152,9 @@ export class Statemachine<
    * so manual lock management keeps its existing control flow. Inspect
    * isLockAcquired() (or the hook) to learn whether the lock was actually
    * freed.
+   *
+   * A failed release of a held lock makes every later operation reject with
+   * LockOwnershipUncertainError; a successful call here is how to recover.
    */
   async releaseLock(): Promise<void> {
     await this.releaseMutex();
@@ -271,6 +275,15 @@ export class Statemachine<
   }
 
   private async runOperation(op: QueuedOperation): Promise<void> {
+    // After a failed release the ownership flag is unreliable: the unlock
+    // may have happened remotely with its reply lost. Running on it would
+    // skip acquisition and execute under a lock another machine may now
+    // hold, so reject before touching the mutex or any callback.
+    if (this.ownershipUncertainty) {
+      op.reject(new LockOwnershipUncertainError(this.ownershipUncertainty.err));
+      return;
+    }
+
     if (
       op.ifStateName !== undefined &&
       this.currentState.getName() !== op.ifStateName
@@ -332,9 +345,15 @@ export class Statemachine<
    * operation also failed, the rejection carries the operation error and this
    * hook is the only place the release error appears.
    *
+   * A failure while the mutex claimed to hold the lock leaves ownership
+   * uncertain and blocks later operations; a success clears that state. A
+   * failed release of a lock the mutex did not claim (a defensive manual
+   * release) is still reported but changes nothing.
+   *
    * @returns null on success, or the failure wrapped for the caller to raise.
    */
   private async releaseMutex(): Promise<{ err: unknown } | null> {
+    const held = this.mutex.isAcquired();
     let failure: { err: unknown } | null = null;
     try {
       if (!(await this.mutex.releaseLock())) {
@@ -344,13 +363,33 @@ export class Statemachine<
       failure = { err };
     }
     if (failure) {
-      try {
-        this.onReleaseError?.(failure.err);
-      } catch {
-        /* a throwing hook must not mask engine errors */
-      }
+      if (held) this.ownershipUncertainty = failure;
+      const err = failure.err;
+      this.callDiagnosticHook(() => this.onReleaseError?.(err));
+    } else {
+      this.ownershipUncertainty = null;
     }
     return failure;
+  }
+
+  /**
+   * Runs a user diagnostic hook in isolation. Neither a synchronous throw nor
+   * a rejection of a returned promise may reach the drain loop or the host:
+   * an unavailable telemetry backend must not fail an operation or, via an
+   * unhandled rejection, terminate the process. A returned promise is
+   * deliberately not awaited — a slow reporter must not stall the runner.
+   */
+  private callDiagnosticHook(hook: () => unknown): void {
+    try {
+      const result = hook();
+      if (isPromiseLike(result)) {
+        result.then(undefined, () => {
+          /* swallow hook failures */
+        });
+      }
+    } catch {
+      /* swallow hook failures */
+    }
   }
 
   private resolveEvent(name: string): EventInterface {
@@ -459,15 +498,12 @@ export class Statemachine<
               },
               (err) => {
                 // Chained errors do not propagate to the original caller;
-                // surface them through the optional sink instead. The sink
-                // must never throw into the drain loop.
-                try {
+                // surface them through the optional sink instead.
+                this.callDiagnosticHook(() =>
                   this.onChainedOperationError?.(err, {
                     eventName: chainedEventName,
-                  });
-                } catch {
-                  /* swallow hook failures */
-                }
+                  }),
+                );
               },
               ifStateName,
             );

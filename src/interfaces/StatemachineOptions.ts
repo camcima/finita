@@ -33,8 +33,11 @@ export interface StatemachineOptions<TSubject = unknown> {
    * Called when an operation chained via EnqueueContext.enqueue() fails.
    * Chained operations are not awaited by the caller whose transition
    * enqueued them, so without this hook their errors are discarded.
-   * Exceptions thrown by the hook itself are swallowed — it must not be
-   * able to break the machine's drain loop.
+   * The hook may be async. It is not awaited, and both exceptions it throws
+   * and rejections of the promise it returns are swallowed — it must not be
+   * able to break the machine's drain loop or surface as an unhandled
+   * rejection. (The return type stays `void`, which already admits async
+   * functions, so callbacks returning incidental values keep compiling.)
    */
   onChainedOperationError?: (
     error: unknown,
@@ -57,7 +60,8 @@ export interface StatemachineOptions<TSubject = unknown> {
    * release throws — including when the operation itself also failed, in
    * which case the caller's rejection carries the operation error and the
    * release error would otherwise be discarded. Does not change rejection
-   * behavior. Exceptions thrown by the hook itself are swallowed.
+   * behavior. The hook may be async; it is not awaited, and both exceptions
+   * it throws and rejections of the promise it returns are swallowed.
    */
   onReleaseError?: (error: unknown) => void;
 }

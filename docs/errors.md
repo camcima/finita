@@ -8,6 +8,7 @@ Custom error classes thrown by the state machine.
 - [WrongEventForStateError](#wrongeventforstateerror)
 - [LockCanNotBeAcquiredError](#lockcannotbeacquirederror)
 - [LockCanNotBeReleasedError](#lockcannotbereleasederror)
+- [LockOwnershipUncertainError](#lockownershipuncertainerror)
 - [DuplicateStateError](#duplicatestateerror)
 - [ProcessFinalizedError](#processfinalizederror)
 - [GraphValidationError](#graphvalidationerror)
@@ -132,6 +133,8 @@ After a top-level operation completes, the engine releases the lock it acquired.
 
 A failed release must never be mistaken for a successful one: the engine skips acquisition when the mutex reports it is already held, so a silently stuck lock would let every later operation piggyback on it and never release it.
 
+Both diagnostic hooks, `onReleaseError` and `onChainedOperationError`, may be async. The engine does not await them, and it swallows both a synchronous throw and a rejection of the returned promise, so an unavailable logging backend can neither change the operation's outcome nor surface as an unhandled rejection.
+
 `Statemachine.releaseLock()` (manual lock management) reports failures through `onReleaseError` but does **not** throw, preserving its `Promise<void>` contract. Inspect `isLockAcquired()` to confirm the lock was freed.
 
 ```typescript
@@ -140,6 +143,25 @@ const sm = new Statemachine(order, process, {
   onReleaseError: (error) => logger.error("lock release failed", { error }),
 });
 ```
+
+---
+
+## LockOwnershipUncertainError
+
+**Import:** `import { LockOwnershipUncertainError } from '@camcima/finita'`
+
+Rejects an operation because an earlier release of a held lock failed. The machine cannot tell whether the unlock happened, so it refuses to run further work on its old ownership flag.
+
+### Properties
+
+| Property | Type      | Description                                     |
+| -------- | --------- | ----------------------------------------------- |
+| `code`   | `string`  | `'lockOwnershipUncertain'`                      |
+| `cause`  | `unknown` | The release failure that made ownership unclear |
+
+### When It's Thrown
+
+Every operation queued behind, chained from, or started after a failed release of a held lock rejects with this error until a manual `Statemachine.releaseLock()` succeeds. If that release cannot succeed, discard the machine and rebuild it from persisted state. See [Release Error Behavior](mutex.md#release-error-behavior) for the full recovery procedure.
 
 ---
 

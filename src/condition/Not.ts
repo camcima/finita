@@ -1,4 +1,6 @@
 import type { ConditionInterface } from "../interfaces/ConditionInterface.js";
+import type { MaybePromise } from "../MaybePromise.js";
+import { isPromiseLike } from "../util/index.js";
 
 export class Not<TSubject = unknown> implements ConditionInterface<TSubject> {
   private readonly condition: ConditionInterface<TSubject>;
@@ -11,10 +13,15 @@ export class Not<TSubject = unknown> implements ConditionInterface<TSubject> {
     return `not ( ${this.condition.getName()} )`;
   }
 
-  async checkCondition(
+  /** Stays synchronous for a synchronous child — see CompositeCondition. */
+  checkCondition(
     subject: TSubject,
     context: Map<string, unknown>,
-  ): Promise<boolean> {
-    return !(await this.condition.checkCondition(subject, context));
+  ): MaybePromise<boolean> {
+    const result = this.condition.checkCondition(subject, context);
+    if (isPromiseLike<boolean>(result)) {
+      return Promise.resolve(result).then((value) => !value);
+    }
+    return !result;
   }
 }

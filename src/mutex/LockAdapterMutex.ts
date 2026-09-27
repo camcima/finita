@@ -18,19 +18,27 @@ export class LockAdapterMutex implements MutexInterface {
    * pass the check and acquire twice on a non-idempotent adapter (database
    * advisory locks, redis SET NX). The pending promise is cleared once it
    * settles, so a failed acquire can still be retried.
+   *
+   * The clearing is attached to the attempt only after it is stored: an
+   * adapter that throws synchronously settles the attempt before the
+   * assignment would otherwise run, and clearing inside the attempt itself
+   * would then leave the rejected promise cached forever.
    */
   async acquireLock(): Promise<boolean> {
     if (this.acquired) {
       return true;
     }
-    this.pendingAcquire ??= (async () => {
-      try {
+    if (!this.pendingAcquire) {
+      const attempt = (async () => {
         this.acquired = await this.lockAdapter.acquireLock(this.resourceName);
         return this.acquired;
-      } finally {
-        this.pendingAcquire = null;
-      }
-    })();
+      })();
+      this.pendingAcquire = attempt;
+      const clear = (): void => {
+        if (this.pendingAcquire === attempt) this.pendingAcquire = null;
+      };
+      attempt.then(clear, clear);
+    }
     return this.pendingAcquire;
   }
 

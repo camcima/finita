@@ -2,6 +2,7 @@ export { FinitaError } from "./FinitaError.js";
 export { WrongEventForStateError } from "./WrongEventForStateError.js";
 export { LockCanNotBeAcquiredError } from "./LockCanNotBeAcquiredError.js";
 export { LockCanNotBeReleasedError } from "./LockCanNotBeReleasedError.js";
+export { LockOwnershipUncertainError } from "./LockOwnershipUncertainError.js";
 export { DuplicateStateError } from "./DuplicateStateError.js";
 export { ProcessFinalizedError } from "./ProcessFinalizedError.js";
 export { GraphValidationError } from "./GraphValidationError.js";

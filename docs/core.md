@@ -92,16 +92,16 @@ A state represents a named node in the workflow graph. In v3, states are constru
 
 ### Methods
 
-| Method                  | Return Type                     | Description                             |
-| ----------------------- | ------------------------------- | --------------------------------------- |
-| `getName()`             | `string`                        | Returns the state name                  |
-| `getTransitions()`      | `Iterable<TransitionInterface>` | Returns all outgoing transitions        |
-| `hasEvent(name)`        | `boolean`                       | Checks if an event exists on this state |
-| `getEvent(name)`        | `EventInterface`                | Returns the event with the given name   |
-| `getEventNames()`       | `string[]`                      | Returns the names of all events         |
-| `getMetadata()`         | `Record<string, unknown>`       | Returns all metadata as a plain object  |
-| `getMetadataValue(key)` | `unknown`                       | Returns the value for a metadata key    |
-| `hasMetadataValue(key)` | `boolean`                       | Checks if a metadata key exists         |
+| Method                  | Return Type                     | Description                                                                           |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
+| `getName()`             | `string`                        | Returns the state name                                                                |
+| `getTransitions()`      | `Iterable<TransitionInterface>` | Returns a snapshot of all outgoing transitions; mutating it does not change the graph |
+| `hasEvent(name)`        | `boolean`                       | Checks if an event exists on this state                                               |
+| `getEvent(name)`        | `EventInterface`                | Returns the event with the given name                                                 |
+| `getEventNames()`       | `string[]`                      | Returns the names of all events                                                       |
+| `getMetadata()`         | `Record<string, unknown>`       | Returns all metadata as a plain object                                                |
+| `getMetadataValue(key)` | `unknown`                       | Returns the value for a metadata key                                                  |
+| `hasMetadataValue(key)` | `boolean`                       | Checks if a metadata key exists                                                       |
 
 ### Key Behaviors
 
