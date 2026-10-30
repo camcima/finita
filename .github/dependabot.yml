@@ -12,13 +12,9 @@ updates:
           - minor
           - patch
     ignore:
-      # vitest 5+ drops Node.js 20 support
-      - dependency-name: "vitest"
-        versions: [">=5"]
-      - dependency-name: "@vitest/coverage-v8"
-        versions: [">=5"]
-      # Held by maintainer (2026-10): remove this entry to resume updates
+      # Allow @types/node minor/patch updates only; majors are bumped deliberately
       - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
