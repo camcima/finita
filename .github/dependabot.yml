@@ -17,6 +17,8 @@ updates:
         versions: [">=5"]
       - dependency-name: "@vitest/coverage-v8"
         versions: [">=5"]
+      # Held by maintainer (2026-10): remove this entry to resume updates
+      - dependency-name: "@types/node"
 
   - package-ecosystem: github-actions
     directory: /
